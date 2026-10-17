@@ -32,33 +32,61 @@ def has_youtube_cookies() -> bool:
     """Vérifie si un fichier de cookies YouTube valide et non-vide est disponible"""
     return COOKIES_FILE.exists() and COOKIES_FILE.stat().st_size > 10
 
+from typing import Optional, Dict, Any
 import shutil
 
-def find_node_binary() -> Optional[str]:
-    """Trouve l'exécutable node.js sur le système (PATH standard, /usr/bin, ou CloudPanel nvm)"""
-    candidate = shutil.which("node")
-    if candidate and os.path.isfile(candidate) and os.access(candidate, os.X_OK):
-        return candidate
-    for p in ["/usr/bin/node", "/usr/local/bin/node", "/bin/node"]:
-        if os.path.isfile(p) and os.access(p, os.X_OK):
-            return p
+def find_js_runtime() -> Dict[str, Any]:
+    """Trouve un runtime JS compatible (node ou deno) pour le solveur de challenges yt-dlp EJS"""
+    # 1. Tester node
+    node_candidate = shutil.which("node")
+    if node_candidate and os.path.isfile(node_candidate) and os.access(node_candidate, os.X_OK):
+        return {"node": {"path": node_candidate}}
+
     home = Path.home()
+    for p in [
+        home / ".local" / "bin" / "node",
+        Path("/usr/bin/node"),
+        Path("/usr/local/bin/node"),
+        Path("/bin/node"),
+    ]:
+        if p.is_file() and os.access(p, os.X_OK):
+            return {"node": {"path": str(p)}}
+
     nvm_nodes = list((home / ".nvm" / "versions" / "node").glob("*/bin/node"))
     if nvm_nodes:
-        return str(nvm_nodes[-1])
-    return None
+        return {"node": {"path": str(nvm_nodes[-1])}}
+
+    # 2. Tester deno
+    deno_candidate = shutil.which("deno")
+    if deno_candidate and os.path.isfile(deno_candidate) and os.access(deno_candidate, os.X_OK):
+        return {"deno": {"path": deno_candidate}}
+
+    for p in [
+        home / ".deno" / "bin" / "deno",
+        home / ".local" / "bin" / "deno",
+        Path("/usr/bin/deno"),
+        Path("/usr/local/bin/deno"),
+    ]:
+        if p.is_file() and os.access(p, os.X_OK):
+            return {"deno": {"path": str(p)}}
+
+    return {}
 
 def get_base_ydl_opts() -> dict:
     """Retourne la configuration commune pour yt-dlp (cookies, runtimes JS, anti-blocage)"""
     opts = {
         "quiet": True,
         "no_warnings": True,
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["default", "web_embedded"]
+            }
+        }
     }
-    node_bin = find_node_binary()
-    if node_bin:
-        opts["js_runtimes"] = {"node": {"path": node_bin}}
-    else:
-        opts["js_runtimes"] = {"node": {}}
+    js_runtimes = find_js_runtime()
+    if js_runtimes:
+        opts["js_runtimes"] = js_runtimes
+
     if has_youtube_cookies():
         opts["cookiefile"] = str(COOKIES_FILE)
     return opts
@@ -69,7 +97,8 @@ def run_ydl_with_fallback(ydl_opts: dict, action_fn):
     """
     Exécute une action yt-dlp (extract_info ou download) avec repli intelligent :
     Si l'appel avec cookies échoue avec 'The page needs to be reloaded',
-    réessaie automatiquement sans cookies (utile quand YouTube rejette les cookies résidentiels sur IP datacenter).
+    réessaie sans cookies. Si le repli échoue également (ex: détection bot datacenter),
+    conserve l'erreur d'origine pour diagnostic précis.
     """
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -78,9 +107,13 @@ def run_ydl_with_fallback(ydl_opts: dict, action_fn):
         err = str(e)
         if "The page needs to be reloaded" in err and "cookiefile" in ydl_opts:
             # Réessayer sans cookiefile
-            fallback_opts = {k: v for k, v in ydl_opts.items() if k != "cookiefile"}
-            with yt_dlp.YoutubeDL(fallback_opts) as ydl:
-                return action_fn(ydl)
+            try:
+                fallback_opts = {k: v for k, v in ydl_opts.items() if k != "cookiefile"}
+                with yt_dlp.YoutubeDL(fallback_opts) as ydl:
+                    return action_fn(ydl)
+            except Exception:
+                raise e
         raise
+
 
 

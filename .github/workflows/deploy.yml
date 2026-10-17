@@ -76,7 +76,15 @@ jobs:
               export PATH="$HOME/.local/bin:$PATH"
             fi
 
-            # 2. Synchroniser les dépendances Python dans l'environnement virtuel
+            # 2. S'assurer qu'un runtime JavaScript autonome (Node.js) est présent pour les challenges yt-dlp EJS
+            if ! command -v node &> /dev/null && [ ! -f "$HOME/.local/bin/node" ]; then
+              echo "⚡ Installation autonome de Node.js dans ~/.local/bin..."
+              mkdir -p "$HOME/.local/bin"
+              curl -fsSL https://nodejs.org/dist/v20.18.3/node-v20.18.3-linux-x64.tar.gz | tar -xz -C "$HOME/.local/bin" --strip-components=2 node-v20.18.3-linux-x64/bin/node 2>/dev/null || true
+              chmod +x "$HOME/.local/bin/node" 2>/dev/null || true
+            fi
+
+            # 3. Synchroniser les dépendances Python dans l'environnement virtuel
             echo "🐍 Installation des dépendances Python..."
             uv sync --no-dev
 

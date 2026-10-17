@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from src.config import OUTPUT_DIR, TEMP_DIR, GEMINI_API_KEY, COOKIES_FILE, has_youtube_cookies, get_base_ydl_opts, run_ydl_with_fallback
+from src.config import OUTPUT_DIR, TEMP_DIR, GEMINI_API_KEY, COOKIES_FILE, has_youtube_cookies, get_base_ydl_opts, run_ydl_with_fallback, find_js_runtime
 from src.extractor import get_video_metadata, extract_transcript, format_timestamp, sanitize_youtube_url
 from src.analyzer import analyze_video_for_viral_clips
 from src.clipper import (
@@ -68,7 +68,7 @@ def run_pipeline_task(job_id: str, url: str, crop_mode: str, auto_render: bool):
 
         job["step"] = "Extraction et transcription de la vidéo..."
         job["updated_at"] = datetime.now().isoformat()
-        segments = extract_transcript(url, metadata)
+        segments = extract_transcript(clean_url, metadata)
         if not segments:
             raise ValueError("Impossible d'extraire la transcription de cette vidéo.")
 
@@ -162,6 +162,7 @@ def health():
         "status": "ok",
         "has_gemini_key": bool(GEMINI_API_KEY and "your_gemini_api_key_here" not in GEMINI_API_KEY),
         "has_cookies": has_youtube_cookies(),
+        "js_runtime": find_js_runtime(),
         "output_dir": str(OUTPUT_DIR),
         "total_shorts": len(list(OUTPUT_DIR.glob("*.json")))
     }
