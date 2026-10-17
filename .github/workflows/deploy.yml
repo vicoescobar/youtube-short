@@ -1,85 +1,95 @@
-name: CI/CD Auto-Deploy to VPS (Native)
+name: Build & Deploy to VPS (CloudPanel)
 
 on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
-  deploy:
-    name: Deploy to OVH VPS
+  build-and-deploy:
+    name: Build & Sync to CloudPanel
     runs-on: ubuntu-latest
 
     steps:
-      - name: Déploiement automatique via SSH
-        uses: appleboy/ssh-action@v1.0.3
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          host: ${{ secrets.SSH_HOST || secrets.VPS_HOST }}
-          username: ${{ secrets.SSH_USER || secrets.VPS_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY || secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.SSH_PORT || secrets.VPS_PORT || 22 }}
-          script_stop: true
-          script: |
-            # 1. Charger tous les chemins possibles dans le PATH
-            export PATH="$HOME/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
+          node-version: 22
 
-            echo "🚀 Démarrage du déploiement sur le VPS..."
-            echo "👤 Utilisateur connecté : $(whoami)"
+      - name: Build Vue Dashboard project
+        run: |
+          cd frontend
+          npm ci
+          npm run build
+          cd ..
 
-            # 2. Définir le dossier cible à partir du secret SSH_TARGET_DIR
-            PROJECT_DIR="${{ secrets.SSH_TARGET_DIR || '/home/victor-giroud-ytshorts/youtube-short' }}"
-            echo "📁 Dossier de déploiement : $PROJECT_DIR"
+      - name: Setup SSH Agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-            # 3. Cloner le projet si nécessaire
-            if [ ! -d "$PROJECT_DIR" ]; then
-              echo "📦 Premier déploiement : Clonage du dépôt..."
-              git clone https://github.com/${{ github.repository }}.git "$PROJECT_DIR"
-            fi
+      - name: Deploy to CloudPanel via rsync
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          TARGET_DIR: ${{ secrets.SSH_TARGET_DIR }}
+          SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
+        run: |
+          mkdir -p ~/.ssh
+          # Enregistrer l'empreinte de la clé du VPS
+          ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts
 
-            cd "$PROJECT_DIR"
+          # Synchroniser les fichiers backend et le frontend compilé vers le VPS
+          # Exclut les rushs, les vidéos générées et les fichiers d'environnement
+          rsync -avz --no-owner --no-group \
+            --exclude '.git' \
+            --exclude '.env' \
+            --exclude 'output' \
+            --exclude 'temp' \
+            --exclude 'frontend/node_modules' \
+            -e "ssh -p $SSH_PORT -o StrictHostKeyChecking=accept-new" \
+            ./ "$SSH_USER@$SSH_HOST:$TARGET_DIR"
 
-            # 4. Mettre à jour le code depuis main
-            echo "📥 Mise à jour du code..."
-            git fetch origin main
-            git reset --hard origin/main
+      - name: Restart FastAPI Server on VPS
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          TARGET_DIR: ${{ secrets.SSH_TARGET_DIR }}
+          SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
+        run: |
+          ssh -p "$SSH_PORT" -o StrictHostKeyChecking=accept-new "$SSH_USER@$SSH_HOST" "bash -s" << 'EOF'
+            export PATH="$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+            cd "${{ secrets.SSH_TARGET_DIR }}"
 
-            # 5. S'assurer de la présence du fichier .env
-            if [ ! -f .env ]; then
-              echo "⚠️ Fichier .env manquant. Création depuis .env.example..."
-              cp .env.example .env
-            fi
+            echo "🚀 Mise à jour et démarrage du serveur..."
 
-            # 6. S'assurer que uv est installé (ultra-rapide, sans root)
+            # 1. S'assurer que uv est installé (ultra-rapide, sans root)
             if ! command -v uv &> /dev/null; then
-              echo "⚡ Installation de uv..."
+              echo "⚡ Installation de uv dans ~/.local/bin..."
               curl -LsSf https://astral.sh/uv/install.sh | sh
               export PATH="$HOME/.local/bin:$PATH"
             fi
 
-            # 7. Synchroniser les dépendances Python
-            echo "🐍 Installation / mise à jour des dépendances Python..."
+            # 2. Synchroniser les dépendances Python dans l'environnement virtuel
+            echo "🐍 Installation des dépendances Python..."
             uv sync --no-dev
 
-            # 8. Build du frontend Vue 3
-            if command -v npm &> /dev/null; then
-              echo "🎨 Build du frontend Vue 3..."
-              cd frontend
-              npm install
-              npm run build
-              cd ..
+            # 3. S'assurer de la présence du fichier .env
+            if [ ! -f .env ]; then
+              echo "⚠️ Création d'un .env template..."
+              cp .env.example .env
             fi
 
-            # 9. Relancer le serveur FastAPI sur le port 8000
-            echo "🔄 Redémarrage du serveur FastAPI..."
-            if command -v pm2 &> /dev/null; then
-              pm2 restart shorts-studio 2>/dev/null || pm2 start "uv run uvicorn src.api:app --host 127.0.0.1 --port 8000" --name shorts-studio
-              pm2 save
-            else
-              # Fallback avec gestion de processus propre (nohup & pid)
-              pkill -u $(whoami) -f "uvicorn src.api:app" 2>/dev/null || true
-              sleep 1
-              nohup uv run uvicorn src.api:app --host 127.0.0.1 --port 8000 > app.log 2>&1 &
-              echo $! > app.pid
-            fi
+            # 4. Redémarrage propre du serveur FastAPI sur le port 8000
+            echo "🔄 Redémarrage du serveur Shorts Studio sur le port 8000..."
+            pkill -u $(whoami) -f "uvicorn src.api:app" 2>/dev/null || true
+            sleep 1
+            nohup uv run uvicorn src.api:app --host 127.0.0.1 --port 8000 > app.log 2>&1 &
+            echo $! > app.pid
 
             echo "✅ Déploiement terminé avec succès ! Le serveur écoute sur 127.0.0.1:8000."
+          EOF
