@@ -1,0 +1,56 @@
+name: CI/CD Auto-Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Deploy to OVH VPS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Déploiement automatique via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script_stop: true
+          script: |
+            echo "🚀 Démarrage du déploiement sur le VPS..."
+
+            # Définir le dossier cible
+            PROJECT_DIR="$HOME/youtube-short"
+
+            # Cloner si le dossier n'existe pas encore
+            if [ ! -d "$PROJECT_DIR" ]; then
+              echo "📦 Premier déploiement : Clonage du dépôt..."
+              git clone https://github.com/${{ github.repository }}.git "$PROJECT_DIR"
+            fi
+
+            cd "$PROJECT_DIR"
+
+            # Récupérer les dernières modifications de la branche main
+            echo "📥 Récupération des dernières modifications..."
+            git fetch origin main
+            git reset --hard origin/main
+
+            # S'assurer que le fichier .env existe
+            if [ ! -f .env ]; then
+              echo "⚠️ Fichier .env manquant. Copie de .env.example..."
+              cp .env.example .env
+              echo "Pensez à éditer $PROJECT_DIR/.env avec vos clés API."
+            fi
+
+            # Construire et démarrer les conteneurs Docker
+            echo "🐳 Build et démarrage des conteneurs Docker..."
+            docker compose up -d --build
+
+            # Nettoyage des images Docker orphelines pour économiser le SSD du VPS (40 Go)
+            echo "🧹 Nettoyage des anciennes images Docker..."
+            docker image prune -f
+
+            echo "✅ Déploiement terminé avec succès !"

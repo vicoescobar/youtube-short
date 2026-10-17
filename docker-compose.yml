@@ -1,0 +1,18 @@
+services:
+  shorts-studio:
+    build: .
+    container_name: shorts-studio
+    restart: unless-stopped
+    ports:
+      # Écoute uniquement sur localhost (127.0.0.1) pour que CloudPanel (Nginx) gère le SSL et le domaine
+      - "127.0.0.1:8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./output:/app/output
+      - ./temp:/app/temp
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

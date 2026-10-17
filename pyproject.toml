@@ -1,0 +1,28 @@
+[project]
+name = "youtube-short"
+version = "0.1.0"
+description = "Add your description here"
+authors = [
+    { name = "victor.giroud", email = "victor.giroud@epita.fr" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "aiofiles>=25.1.0",
+    "fastapi>=0.110.0",
+    "google-genai>=2.31.0",
+    "groq>=1.7.0",
+    "mediapipe>=1.1.1",
+    "pydantic>=2.14.1",
+    "python-dotenv>=1.2.4",
+    "python-multipart>=0.0.32",
+    "rich>=15.0.0",
+    "uvicorn[standard]>=0.28.0",
+    "yt-dlp>=2026.8.19",
+]
+
+[project.scripts]
+youtube-short = "youtube_short:main"
+
+[build-system]
+requires = ["uv_build>=0.12.21,<0.13.0"]
+build-backend = "uv_build"
