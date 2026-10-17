@@ -38,6 +38,11 @@ def get_base_ydl_opts() -> dict:
         "quiet": True,
         "no_warnings": True,
         "js_runtimes": {"node": {}},
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["web", "mweb", "android", "ios"]
+            }
+        }
     }
     if has_youtube_cookies():
         opts["cookiefile"] = str(COOKIES_FILE)

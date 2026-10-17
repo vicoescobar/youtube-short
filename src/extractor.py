@@ -23,20 +23,29 @@ def format_timestamp(seconds: float) -> str:
         return f"{hrs:02d}:{mins:02d}:{secs:02d}"
     return f"{mins:02d}:{secs:02d}"
 
+def sanitize_youtube_url(url: str) -> str:
+    """Nettoie l'URL YouTube en ne gardant que l'identifiant propre sans tracking (&pp=, &si=, &feature=...)"""
+    match = re.search(r"(?:v=|\/live\/|\/shorts\/|youtu\.be\/|\/v\/|embed\/)([a-zA-Z0-9_-]{11})", url)
+    if match:
+        video_id = match.group(1)
+        return f"https://www.youtube.com/watch?v={video_id}"
+    return url.strip()
+
 def get_video_metadata(url: str) -> VideoMetadata:
     """Récupère les informations de base de la vidéo sans rien télécharger"""
+    clean_url = sanitize_youtube_url(url)
     ydl_opts = {
         **get_base_ydl_opts(),
         'skip_download': True,
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=False)
+        info = ydl.extract_info(clean_url, download=False)
         return VideoMetadata(
             video_id=info.get('id', ''),
             title=info.get('title', 'Sans titre'),
             channel=info.get('uploader', 'Chaîne inconnue'),
             duration=int(info.get('duration', 0)),
-            webpage_url=info.get('webpage_url', url)
+            webpage_url=info.get('webpage_url', clean_url)
         )
 
 def _parse_json3_subtitles(file_path: Path) -> List[TranscriptSegment]:
@@ -240,8 +249,9 @@ def extract_transcript(url: str, metadata: VideoMetadata) -> List[TranscriptSegm
     1. Essaie de récupérer les sous-titres YouTube (0 Mo de vidéo, 1 sec).
     2. Si indisponible, télécharge uniquement la piste audio compressée et transcrit via Groq.
     """
+    clean_url = sanitize_youtube_url(url)
     console.print(f"[bold blue]Analyse des sous-titres disponibles pour : {metadata.title}...[/bold blue]")
-    segments = _extract_youtube_subtitles(url, metadata.video_id)
+    segments = _extract_youtube_subtitles(clean_url, metadata.video_id)
     if segments and len(segments) > 5:
         console.print(f"[green]✓ Sous-titres YouTube récupérés avec succès ({len(segments)} segments) sans aucun téléchargement lourd ![/green]")
         return segments
@@ -263,7 +273,7 @@ def extract_transcript(url: str, metadata: VideoMetadata) -> List[TranscriptSegm
     
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
+            ydl.download([clean_url])
         
         segments = _transcribe_with_groq(audio_path)
         console.print(f"[green]✓ Transcription Groq réussie ({len(segments)} segments) ![/green]")

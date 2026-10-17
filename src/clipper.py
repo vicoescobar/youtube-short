@@ -9,6 +9,7 @@ from rich.console import Console
 from src.config import TEMP_DIR, OUTPUT_DIR, get_base_ydl_opts
 from src.models import TranscriptSegment, ViralClipRecommendation
 from src.tracker import compute_smart_crop_expression
+from src.extractor import sanitize_youtube_url
 
 console = Console()
 
@@ -102,8 +103,9 @@ def download_video_segment(
     if output_raw_video.exists():
         output_raw_video.unlink()
 
+    clean_url = sanitize_youtube_url(url)
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([url])
+        ydl.download([clean_url])
 
 def render_vertical_short(
     raw_video_path: Path,

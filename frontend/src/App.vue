@@ -309,13 +309,25 @@
 
         <!-- Explication guidée -->
         <div class="p-4 rounded-xl bg-white/[0.03] border border-white/5 text-xs text-slate-300 space-y-2 mb-4">
-          <div class="font-semibold text-purple-300">Comment exporter vos cookies en 30 secondes :</div>
+          <div class="font-semibold text-purple-300">Comment exporter vos cookies sans erreur de rechargement :</div>
           <ol class="list-decimal list-inside space-y-1.5 text-slate-400">
             <li>Installez l'extension Chrome ou Firefox <a href="https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc" target="_blank" rel="noopener" class="text-purple-400 underline font-semibold">Get cookies.txt LOCALLY</a>.</li>
-            <li>Ouvrez <a href="https://youtube.com" target="_blank" rel="noopener" class="text-purple-400 underline font-semibold">youtube.com</a> (connecté à votre compte ou un compte secondaire).</li>
-            <li>Cliquez sur l'icône de l'extension et cliquez sur <strong>Export</strong> (télécharge un fichier <code class="text-purple-300">cookies.txt</code>).</li>
-            <li>Glissez ce fichier ci-dessous ou collez son contenu texte.</li>
+            <li>Ouvrez <a href="https://youtube.com" target="_blank" rel="noopener" class="text-purple-400 underline font-semibold">youtube.com</a> (assurez-vous d'être bien <strong>connecté à votre compte Google/YouTube</strong>).</li>
+            <li><strong>Rechargez la page (F5)</strong> et lancez une vidéo 2 secondes (indispensable pour générer des jetons de session actifs).</li>
+            <li>Cliquez sur l'icône de l'extension et cliquez sur <strong>Export</strong>.</li>
+            <li>Glissez le fichier <code class="text-purple-300">cookies.txt</code> ci-dessous ou collez son contenu.</li>
           </ol>
+        </div>
+
+        <!-- Résultat du test de session -->
+        <div v-if="testResult" class="p-3.5 rounded-xl text-xs mb-4 border" :class="testResult.success ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-200' : 'bg-amber-500/15 border-amber-500/30 text-amber-200'">
+          <div class="flex items-start gap-2 font-semibold">
+            <span class="text-sm">{{ testResult.success ? '✓' : '⚠️' }}</span>
+            <span>{{ testResult.success ? testResult.message : testResult.error }}</span>
+          </div>
+          <div v-if="testResult.hint" class="text-slate-300 mt-1 pl-5 text-[11px] leading-relaxed">
+            💡 {{ testResult.hint }}
+          </div>
         </div>
 
         <!-- Zone de dépôt de fichier -->
@@ -350,7 +362,16 @@
             <span v-if="cookiesStatus.configured" class="text-emerald-400 font-medium">✓ Actifs sur le serveur ({{ Math.round(cookiesStatus.file_size_bytes / 1024) }} Ko)</span>
             <span v-else class="text-amber-400 font-medium">⚠️ Aucun cookie configuré</span>
           </div>
-          <div class="flex gap-2">
+          <div class="flex flex-wrap gap-2">
+            <button 
+              @click="testCurrentCookies"
+              :disabled="testingCookies"
+              type="button" 
+              class="btn btn-secondary text-xs px-3 py-1.5 flex items-center gap-1.5"
+            >
+              <span v-if="testingCookies" class="spinner inline-block w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full"></span>
+              <span>{{ testingCookies ? 'Test en cours...' : '🧪 Tester la connexion' }}</span>
+            </button>
             <button 
               v-if="cookiesStatus.configured" 
               @click="removeCookies" 
@@ -392,6 +413,8 @@ const savingCookies = ref(false)
 const dragOver = ref(false)
 const fileInput = ref(null)
 const cookiesStatus = ref({ configured: false, file_size_bytes: 0 })
+const testResult = ref(null)
+const testingCookies = ref(false)
 
 let pollInterval = null
 
@@ -478,6 +501,7 @@ const readFileContent = (file) => {
 const saveCookies = async () => {
   if (!cookiesInputText.value.trim()) return
   savingCookies.value = true
+  testResult.value = null
   try {
     const res = await fetch('/api/cookies', {
       method: 'POST',
@@ -488,7 +512,8 @@ const saveCookies = async () => {
       showToast('Cookies YouTube enregistrés avec succès !')
       cookiesInputText.value = ''
       await fetchCookiesStatus()
-      showCookiesModal.value = false
+      // Tester immédiatement les cookies nouvellement enregistrés
+      await testCurrentCookies()
     } else {
       const data = await res.json()
       showToast('Erreur : ' + (data.detail || 'Impossible d enregistrer'))
@@ -497,6 +522,30 @@ const saveCookies = async () => {
     showToast('Erreur réseau lors de l enregistrement')
   } finally {
     savingCookies.value = false
+  }
+}
+
+const testCurrentCookies = async () => {
+  testingCookies.value = true
+  testResult.value = null
+  try {
+    const res = await fetch('/api/cookies/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: videoUrl.value || undefined })
+    })
+    const data = await res.json()
+    testResult.value = data
+    if (data.success) {
+      showToast('Session YouTube validée !')
+    }
+  } catch (err) {
+    testResult.value = {
+      success: false,
+      error: 'Erreur lors du test de connexion : ' + err.message
+    }
+  } finally {
+    testingCookies.value = false
   }
 }
 

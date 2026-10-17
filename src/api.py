@@ -12,14 +12,15 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from src.config import OUTPUT_DIR, TEMP_DIR, GEMINI_API_KEY, COOKIES_FILE, has_youtube_cookies
-from src.extractor import get_video_metadata, extract_transcript, format_timestamp
+from src.config import OUTPUT_DIR, TEMP_DIR, GEMINI_API_KEY, COOKIES_FILE, has_youtube_cookies, get_base_ydl_opts
+from src.extractor import get_video_metadata, extract_transcript, format_timestamp, sanitize_youtube_url
 from src.analyzer import analyze_video_for_viral_clips
 from src.clipper import (
     generate_ass_subtitles,
     download_video_segment,
     render_vertical_short,
 )
+import yt_dlp
 
 app = FastAPI(title="YouTube Shorts Viral Clipper API", version="1.0.0")
 
@@ -43,16 +44,20 @@ class AnalyzeRequest(BaseModel):
 class CookiesPayload(BaseModel):
     content: str
 
+class CookieTestRequest(BaseModel):
+    url: Optional[str] = None
+
 
 def run_pipeline_task(job_id: str, url: str, crop_mode: str, auto_render: bool):
     """Tâche d'arrière-plan exécutant l'extraction, l'analyse et le rendu optionnel"""
     job = jobs[job_id]
     try:
+        clean_url = sanitize_youtube_url(url)
         job["status"] = "processing"
         job["step"] = "Récupération des métadonnées de la vidéo..."
         job["updated_at"] = datetime.now().isoformat()
 
-        metadata = get_video_metadata(url)
+        metadata = get_video_metadata(clean_url)
         job["metadata"] = {
             "title": metadata.title,
             "channel": metadata.channel,
@@ -130,7 +135,9 @@ def run_pipeline_task(job_id: str, url: str, crop_mode: str, auto_render: bool):
 
     except Exception as e:
         err_msg = str(e)
-        if "Sign in to confirm you’re not a bot" in err_msg or "confirm you're not a bot" in err_msg.lower():
+        if "The page needs to be reloaded" in err_msg:
+            err_msg = "YouTube a renvoyé 'The page needs to be reloaded'. Vos cookies sont expirés, incomplets ou ont été exportés sans recharger la page. Veuillez réexporter des cookies frais depuis youtube.com (en rechargeant avec F5 avant)."
+        elif "Sign in to confirm you’re not a bot" in err_msg or "confirm you're not a bot" in err_msg.lower():
             err_msg = "YouTube exige une authentification (protection anti-bot VPS). Veuillez renseigner vos cookies YouTube via le bouton 'Cookies YouTube' en haut de la page."
         
         job["status"] = "failed"
@@ -196,6 +203,37 @@ def delete_cookies():
     if COOKIES_FILE.exists():
         COOKIES_FILE.unlink()
     return {"status": "deleted", "configured": False}
+
+@app.post("/api/cookies/test")
+def test_youtube_connection(req: CookieTestRequest):
+    """Teste la validité de la session YouTube avec les cookies actuels"""
+    test_url = sanitize_youtube_url(req.url or "https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+    try:
+        ydl_opts = {
+            **get_base_ydl_opts(),
+            'skip_download': True,
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(test_url, download=False)
+            return {
+                "success": True,
+                "title": info.get("title", ""),
+                "channel": info.get("uploader", ""),
+                "duration": info.get("duration", 0),
+                "message": f"Session YouTube validée avec succès ! (Vidéo test : {info.get('title')})"
+            }
+    except Exception as e:
+        err = str(e)
+        hint = "Vérifiez que votre fichier cookies.txt contient une session active."
+        if "The page needs to be reloaded" in err:
+            hint = "YouTube a rejeté la session ('The page needs to be reloaded'). Assurez-vous d'avoir rechargé la page YouTube dans votre navigateur (F5), vérifiez qu'aucune bannière d'avertissement n'est affichée, puis réexportez."
+        elif "Sign in to confirm you’re not a bot" in err or "confirm you're not a bot" in err.lower():
+            hint = "YouTube ne trouve pas de session de compte connecté dans ces cookies. Connectez-vous sur youtube.com avant d'exporter."
+        return {
+            "success": False,
+            "error": err,
+            "hint": hint
+        }
 
 
 @app.post("/api/analyze")
