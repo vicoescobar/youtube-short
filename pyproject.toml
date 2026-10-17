@@ -16,6 +16,7 @@ dependencies = [
     "python-dotenv>=1.2.4",
     "python-multipart>=0.0.32",
     "rich>=15.0.0",
+    "secretstorage>=3.5.0",
     "uvicorn[standard]>=0.28.0",
     "yt-dlp[default]>=2026.8.19",
 ]

@@ -32,13 +32,33 @@ def has_youtube_cookies() -> bool:
     """Vérifie si un fichier de cookies YouTube valide et non-vide est disponible"""
     return COOKIES_FILE.exists() and COOKIES_FILE.stat().st_size > 10
 
+import shutil
+
+def find_node_binary() -> Optional[str]:
+    """Trouve l'exécutable node.js sur le système (PATH standard, /usr/bin, ou CloudPanel nvm)"""
+    candidate = shutil.which("node")
+    if candidate and os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+        return candidate
+    for p in ["/usr/bin/node", "/usr/local/bin/node", "/bin/node"]:
+        if os.path.isfile(p) and os.access(p, os.X_OK):
+            return p
+    home = Path.home()
+    nvm_nodes = list((home / ".nvm" / "versions" / "node").glob("*/bin/node"))
+    if nvm_nodes:
+        return str(nvm_nodes[-1])
+    return None
+
 def get_base_ydl_opts() -> dict:
     """Retourne la configuration commune pour yt-dlp (cookies, runtimes JS, anti-blocage)"""
     opts = {
         "quiet": True,
         "no_warnings": True,
-        "js_runtimes": {"node": {}},
     }
+    node_bin = find_node_binary()
+    if node_bin:
+        opts["js_runtimes"] = {"node": {"path": node_bin}}
+    else:
+        opts["js_runtimes"] = {"node": {}}
     if has_youtube_cookies():
         opts["cookiefile"] = str(COOKIES_FILE)
     return opts
