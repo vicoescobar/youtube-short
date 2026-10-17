@@ -2,6 +2,7 @@ import os
 import json
 import uuid
 import asyncio
+import shutil
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from datetime import datetime
@@ -12,7 +13,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from src.config import OUTPUT_DIR, TEMP_DIR, GEMINI_API_KEY, COOKIES_FILE, has_youtube_cookies, get_base_ydl_opts, run_ydl_with_fallback, find_js_runtime
+from src.config import OUTPUT_DIR, TEMP_DIR, GEMINI_API_KEY, COOKIES_FILE, has_youtube_cookies, get_base_ydl_opts, run_ydl_with_fallback, find_js_runtime, find_ffmpeg_location
 from src.extractor import get_video_metadata, extract_transcript, format_timestamp, sanitize_youtube_url
 from src.analyzer import analyze_video_for_viral_clips
 from src.clipper import (
