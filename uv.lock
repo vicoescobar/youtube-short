@@ -1446,6 +1446,7 @@ dependencies = [
     { name = "secretstorage" },
     { name = "uvicorn", extra = ["standard"] },
     { name = "yt-dlp", extra = ["default"] },
+    { name = "yt-dlp-ejs" },
 ]
 
 [package.metadata]
@@ -1462,6 +1463,7 @@ requires-dist = [
     { name = "secretstorage", specifier = ">=3.5.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.28.0" },
     { name = "yt-dlp", extras = ["default"], specifier = ">=2026.8.19" },
+    { name = "yt-dlp-ejs", specifier = ">=0.8.0" },
 ]
 
 [[package]]

@@ -19,6 +19,7 @@ dependencies = [
     "secretstorage>=3.5.0",
     "uvicorn[standard]>=0.28.0",
     "yt-dlp[default]>=2026.8.19",
+    "yt-dlp-ejs>=0.8.0",
 ]
 
 [project.scripts]
