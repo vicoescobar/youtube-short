@@ -169,12 +169,19 @@ def health():
         except Exception as ex:
             node_exec = {"error": str(ex)}
 
+    try:
+        import yt_dlp_ejs
+        ejs_ver = getattr(yt_dlp_ejs, "__version__", "installed")
+    except Exception as ex:
+        ejs_ver = f"Missing: {ex}"
+
     return {
         "status": "ok",
         "has_gemini_key": bool(GEMINI_API_KEY and "your_gemini_api_key_here" not in GEMINI_API_KEY),
         "has_cookies": has_youtube_cookies(),
         "js_runtime": js_rt,
         "node_exec": node_exec,
+        "ejs_version": ejs_ver,
         "ffmpeg": shutil.which("ffmpeg"),
         "output_dir": str(OUTPUT_DIR),
         "total_shorts": len(list(OUTPUT_DIR.glob("*.json")))
