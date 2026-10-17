@@ -1,20 +1,26 @@
-import cv2
-import numpy as np
 from pathlib import Path
 from typing import List, Tuple, Optional
-import mediapipe as mp
-from mediapipe.tasks import python
-from mediapipe.tasks.python import vision
 from rich.console import Console
 
 console = Console()
 
 MODEL_PATH = Path(__file__).parent / "models_weights" / "blaze_face_short_range.tflite"
 
-def get_face_detector() -> Optional[vision.FaceDetector]:
+# Import protégé d'OpenCV et MediaPipe (pour éviter un crash serveur si libGL.so.1 manque sur un VPS headless)
+try:
+    import cv2
+    import numpy as np
+    import mediapipe as mp
+    from mediapipe.tasks import python
+    from mediapipe.tasks.python import vision
+    OPENCV_AVAILABLE = True
+except (ImportError, Exception) as e:
+    OPENCV_AVAILABLE = False
+    _cv_error = str(e)
+
+def get_face_detector():
     """Initialise le détecteur de visage MediaPipe BlazeFace (225 Ko)"""
-    if not MODEL_PATH.exists():
-        console.print(f"[yellow]Modèle {MODEL_PATH} introuvable, détection de visage désactivée.[/yellow]")
+    if not OPENCV_AVAILABLE or not MODEL_PATH.exists():
         return None
     try:
         base_options = python.BaseOptions(model_asset_path=str(MODEL_PATH))
