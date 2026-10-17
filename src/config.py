@@ -91,6 +91,7 @@ def get_base_ydl_opts() -> dict:
     opts = {
         "quiet": True,
         "no_warnings": True,
+        "remote_components": ["ejs:github"],
         "extractor_args": {
             "youtube": {
                 "player_client": ["default", "-tv_downgraded"]
