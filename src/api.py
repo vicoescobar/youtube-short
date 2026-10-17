@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from src.config import OUTPUT_DIR, TEMP_DIR, GEMINI_API_KEY, COOKIES_FILE, has_youtube_cookies, get_base_ydl_opts
+from src.config import OUTPUT_DIR, TEMP_DIR, GEMINI_API_KEY, COOKIES_FILE, has_youtube_cookies, get_base_ydl_opts, run_ydl_with_fallback
 from src.extractor import get_video_metadata, extract_transcript, format_timestamp, sanitize_youtube_url
 from src.analyzer import analyze_video_for_viral_clips
 from src.clipper import (
@@ -213,9 +213,8 @@ def test_youtube_connection(req: CookieTestRequest):
             **get_base_ydl_opts(),
             'skip_download': True,
         }
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(test_url, download=False)
-            return {
+        info = run_ydl_with_fallback(ydl_opts, lambda ydl: ydl.extract_info(test_url, download=False))
+        return {
                 "success": True,
                 "title": info.get("title", ""),
                 "channel": info.get("uploader", ""),

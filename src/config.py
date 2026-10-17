@@ -43,3 +43,24 @@ def get_base_ydl_opts() -> dict:
         opts["cookiefile"] = str(COOKIES_FILE)
     return opts
 
+import yt_dlp
+
+def run_ydl_with_fallback(ydl_opts: dict, action_fn):
+    """
+    Exécute une action yt-dlp (extract_info ou download) avec repli intelligent :
+    Si l'appel avec cookies échoue avec 'The page needs to be reloaded',
+    réessaie automatiquement sans cookies (utile quand YouTube rejette les cookies résidentiels sur IP datacenter).
+    """
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            return action_fn(ydl)
+    except Exception as e:
+        err = str(e)
+        if "The page needs to be reloaded" in err and "cookiefile" in ydl_opts:
+            # Réessayer sans cookiefile
+            fallback_opts = {k: v for k, v in ydl_opts.items() if k != "cookiefile"}
+            with yt_dlp.YoutubeDL(fallback_opts) as ydl:
+                return action_fn(ydl)
+        raise
+
+

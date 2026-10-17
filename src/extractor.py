@@ -9,7 +9,7 @@ from typing import List, Optional, Tuple
 import yt_dlp
 from rich.console import Console
 
-from src.config import TEMP_DIR, GROQ_API_KEY, get_base_ydl_opts
+from src.config import TEMP_DIR, GROQ_API_KEY, get_base_ydl_opts, run_ydl_with_fallback
 from src.models import TranscriptSegment, VideoMetadata
 
 console = Console()
@@ -38,9 +38,8 @@ def get_video_metadata(url: str) -> VideoMetadata:
         **get_base_ydl_opts(),
         'skip_download': True,
     }
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(clean_url, download=False)
-        return VideoMetadata(
+    info = run_ydl_with_fallback(ydl_opts, lambda ydl: ydl.extract_info(clean_url, download=False))
+    return VideoMetadata(
             video_id=info.get('id', ''),
             title=info.get('title', 'Sans titre'),
             channel=info.get('uploader', 'Chaîne inconnue'),
@@ -116,8 +115,7 @@ def _extract_youtube_subtitles(url: str, video_id: str) -> Optional[List[Transcr
     }
     
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
+        run_ydl_with_fallback(ydl_opts, lambda ydl: ydl.download([url]))
     except Exception as e:
         console.print(f"[yellow]Avertissement lors de l'extraction des sous-titres : {e}[/yellow]")
         return None
@@ -272,8 +270,7 @@ def extract_transcript(url: str, metadata: VideoMetadata) -> List[TranscriptSegm
     }
     
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([clean_url])
+        run_ydl_with_fallback(ydl_opts, lambda ydl: ydl.download([clean_url]))
         
         segments = _transcribe_with_groq(audio_path)
         console.print(f"[green]✓ Transcription Groq réussie ({len(segments)} segments) ![/green]")

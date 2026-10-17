@@ -308,14 +308,19 @@
         </div>
 
         <!-- Explication guidée -->
-        <div class="p-4 rounded-xl bg-white/[0.03] border border-white/5 text-xs text-slate-300 space-y-2 mb-4">
-          <div class="font-semibold text-purple-300">Comment exporter vos cookies sans erreur de rechargement :</div>
-          <ol class="list-decimal list-inside space-y-1.5 text-slate-400">
-            <li>Installez l'extension Chrome ou Firefox <a href="https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc" target="_blank" rel="noopener" class="text-purple-400 underline font-semibold">Get cookies.txt LOCALLY</a>.</li>
-            <li>Ouvrez <a href="https://youtube.com" target="_blank" rel="noopener" class="text-purple-400 underline font-semibold">youtube.com</a> (assurez-vous d'être bien <strong>connecté à votre compte Google/YouTube</strong>).</li>
-            <li><strong>Rechargez la page (F5)</strong> et lancez une vidéo 2 secondes (indispensable pour générer des jetons de session actifs).</li>
-            <li>Cliquez sur l'icône de l'extension et cliquez sur <strong>Export</strong>.</li>
-            <li>Glissez le fichier <code class="text-purple-300">cookies.txt</code> ci-dessous ou collez son contenu.</li>
+        <div class="p-4 rounded-xl bg-purple-950/25 border border-purple-500/30 text-xs text-slate-300 space-y-2.5 mb-4">
+          <div class="font-bold text-purple-300 flex items-center gap-1.5 text-sm">
+            <span>✨</span> Méthode recommandée (résout 'The page needs to be reloaded') :
+          </div>
+          <ol class="list-decimal list-inside space-y-2 text-slate-300">
+            <li>Ouvrez <a href="https://youtube.com" target="_blank" rel="noopener" class="text-purple-400 underline font-semibold">youtube.com</a> et assurez-vous d'être connecté à votre compte.</li>
+            <li>
+              <strong class="text-white">Astuce clé :</strong> Dans ce même onglet, ouvrez l'adresse 
+              <a href="https://www.youtube.com/robots.txt" target="_blank" rel="noopener" class="text-cyan-400 font-mono underline bg-white/5 px-1.5 py-0.5 rounded">https://www.youtube.com/robots.txt</a>
+              <div class="text-[11px] text-slate-400 pl-4 mt-0.5">↳ Cela empêche YouTube de modifier ou désynchroniser vos jetons de session au moment de l'export.</div>
+            </li>
+            <li>Cliquez sur l'extension <span class="text-purple-300 font-semibold">Get cookies.txt LOCALLY</span> -> cliquez sur <strong>Export</strong>.</li>
+            <li>Déposez le fichier <code class="text-purple-300">cookies.txt</code> ci-dessous et cliquez sur <strong>Enregistrer</strong>.</li>
           </ol>
         </div>
 
