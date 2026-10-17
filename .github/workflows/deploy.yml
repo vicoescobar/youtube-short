@@ -84,7 +84,15 @@ jobs:
               chmod +x "$HOME/.local/bin/node" 2>/dev/null || true
             fi
 
-            # 3. Synchroniser les dépendances Python dans l'environnement virtuel
+            # 3. S'assurer que FFmpeg et ffprobe sont présents pour la fusion et le découpage audio/vidéo
+            if ! command -v ffmpeg &> /dev/null && [ ! -f "$HOME/.local/bin/ffmpeg" ]; then
+              echo "⚡ Installation autonome de FFmpeg dans ~/.local/bin..."
+              mkdir -p "$HOME/.local/bin"
+              curl -fsSL https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz | tar -xJ -C "$HOME/.local/bin" --strip-components=1 2>/dev/null || true
+              chmod +x "$HOME/.local/bin/ffmpeg" "$HOME/.local/bin/ffprobe" 2>/dev/null || true
+            fi
+
+            # 4. Synchroniser les dépendances Python dans l'environnement virtuel
             echo "🐍 Installation des dépendances Python..."
             uv sync --no-dev
 

@@ -174,6 +174,7 @@ def health():
         "has_cookies": has_youtube_cookies(),
         "js_runtime": js_rt,
         "node_exec": node_exec,
+        "ffmpeg": shutil.which("ffmpeg"),
         "output_dir": str(OUTPUT_DIR),
         "total_shorts": len(list(OUTPUT_DIR.glob("*.json")))
     }

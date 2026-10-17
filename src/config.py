@@ -72,6 +72,20 @@ def find_js_runtime() -> Dict[str, Any]:
 
     return {}
 
+def find_ffmpeg_location() -> Optional[str]:
+    """Trouve le dossier contenant ffmpeg sur le système"""
+    cand = shutil.which("ffmpeg")
+    if cand and os.path.isfile(cand) and os.access(cand, os.X_OK):
+        return str(Path(cand).parent)
+    home = Path.home()
+    local_bin = home / ".local" / "bin" / "ffmpeg"
+    if local_bin.is_file() and os.access(local_bin, os.X_OK):
+        return str(local_bin.parent)
+    for p in ["/usr/bin/ffmpeg", "/usr/local/bin/ffmpeg", "/bin/ffmpeg"]:
+        if os.path.isfile(p) and os.access(p, os.X_OK):
+            return str(Path(p).parent)
+    return None
+
 def get_base_ydl_opts() -> dict:
     """Retourne la configuration commune pour yt-dlp (cookies, runtimes JS, anti-blocage)"""
     opts = {
@@ -86,6 +100,10 @@ def get_base_ydl_opts() -> dict:
     js_runtimes = find_js_runtime()
     if js_runtimes:
         opts["js_runtimes"] = js_runtimes
+
+    ffmpeg_dir = find_ffmpeg_location()
+    if ffmpeg_dir:
+        opts["ffmpeg_location"] = ffmpeg_dir
 
     if has_youtube_cookies():
         opts["cookiefile"] = str(COOKIES_FILE)
