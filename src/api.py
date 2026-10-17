@@ -222,20 +222,32 @@ def delete_cookies():
 def test_youtube_connection(req: CookieTestRequest):
     """Teste la validité de la session YouTube avec les cookies actuels"""
     test_url = sanitize_youtube_url(req.url or "https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+    logs = []
+    class CustomLogger:
+        def debug(self, msg): logs.append(f"DEBUG: {msg}")
+        def info(self, msg): logs.append(f"INFO: {msg}")
+        def warning(self, msg): logs.append(f"WARNING: {msg}")
+        def error(self, msg): logs.append(f"ERROR: {msg}")
+
+    ydl_opts = {
+        **get_base_ydl_opts(),
+        'quiet': False,
+        'no_warnings': False,
+        'skip_download': True,
+        'check_formats': False,
+        'logger': CustomLogger(),
+    }
     try:
-        ydl_opts = {
-            **get_base_ydl_opts(),
-            'skip_download': True,
-            'check_formats': False,
-        }
         info = run_ydl_with_fallback(ydl_opts, lambda ydl: ydl.extract_info(test_url, download=False))
         return {
-                "success": True,
-                "title": info.get("title", ""),
-                "channel": info.get("uploader", ""),
-                "duration": info.get("duration", 0),
-                "message": f"Session YouTube validée avec succès ! (Vidéo test : {info.get('title')})"
-            }
+            "success": True,
+            "title": info.get("title", ""),
+            "channel": info.get("uploader", ""),
+            "duration": info.get("duration", 0),
+            "formats_count": len(info.get("formats", [])),
+            "logs": logs[-15:],
+            "message": f"Session YouTube validée avec succès ! (Vidéo test : {info.get('title')})"
+        }
     except Exception as e:
         err = str(e)
         hint = "Vérifiez que votre fichier cookies.txt contient une session active."
@@ -246,7 +258,9 @@ def test_youtube_connection(req: CookieTestRequest):
         return {
             "success": False,
             "error": err,
-            "hint": hint
+            "hint": hint,
+            "logs": logs[-20:],
+            "ydl_opts": {k: str(v) for k, v in ydl_opts.items() if k != "cookiefile"}
         }
 
 
