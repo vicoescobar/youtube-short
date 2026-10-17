@@ -226,6 +226,7 @@ def test_youtube_connection(req: CookieTestRequest):
         ydl_opts = {
             **get_base_ydl_opts(),
             'skip_download': True,
+            'check_formats': False,
         }
         info = run_ydl_with_fallback(ydl_opts, lambda ydl: ydl.extract_info(test_url, download=False))
         return {
