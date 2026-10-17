@@ -36,27 +36,10 @@ from typing import Optional, Dict, Any
 import shutil
 
 def find_js_runtime() -> Dict[str, Any]:
-    """Trouve un runtime JS compatible (node ou deno) pour le solveur de challenges yt-dlp EJS"""
-    # 1. Tester node
-    node_candidate = shutil.which("node")
-    if node_candidate and os.path.isfile(node_candidate) and os.access(node_candidate, os.X_OK):
-        return {"node": {"path": node_candidate}}
-
+    """Trouve un runtime JS compatible (priorité à Deno, recommandé par yt-dlp)"""
     home = Path.home()
-    for p in [
-        home / ".local" / "bin" / "node",
-        Path("/usr/bin/node"),
-        Path("/usr/local/bin/node"),
-        Path("/bin/node"),
-    ]:
-        if p.is_file() and os.access(p, os.X_OK):
-            return {"node": {"path": str(p)}}
 
-    nvm_nodes = list((home / ".nvm" / "versions" / "node").glob("*/bin/node"))
-    if nvm_nodes:
-        return {"node": {"path": str(nvm_nodes[-1])}}
-
-    # 2. Tester deno
+    # 1. Tester deno (recommandé par yt-dlp pour les challenges YouTube)
     deno_candidate = shutil.which("deno")
     if deno_candidate and os.path.isfile(deno_candidate) and os.access(deno_candidate, os.X_OK):
         return {"deno": {"path": deno_candidate}}
@@ -69,6 +52,24 @@ def find_js_runtime() -> Dict[str, Any]:
     ]:
         if p.is_file() and os.access(p, os.X_OK):
             return {"deno": {"path": str(p)}}
+
+    # 2. Tester node
+    node_candidate = shutil.which("node")
+    if node_candidate and os.path.isfile(node_candidate) and os.access(node_candidate, os.X_OK):
+        return {"node": {"path": node_candidate}}
+
+    for p in [
+        home / ".local" / "bin" / "node",
+        Path("/usr/bin/node"),
+        Path("/usr/local/bin/node"),
+        Path("/bin/node"),
+    ]:
+        if p.is_file() and os.access(p, os.X_OK):
+            return {"node": {"path": str(p)}}
+
+    nvm_nodes = list((home / ".nvm" / "versions" / "node").glob("*/bin/node"))
+    if nvm_nodes:
+        return {"node": {"path": str(nvm_nodes[-1])}}
 
     return {}
 

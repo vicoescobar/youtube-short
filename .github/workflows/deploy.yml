@@ -76,7 +76,14 @@ jobs:
               export PATH="$HOME/.local/bin:$PATH"
             fi
 
-            # 2. S'assurer qu'un runtime JavaScript autonome (Node.js) est présent pour les challenges yt-dlp EJS
+            # 2. S'assurer que Deno est installé (runtime JS recommandé et supporté nativement par yt-dlp)
+            if ! command -v deno &> /dev/null && [ ! -f "$HOME/.deno/bin/deno" ]; then
+              echo "⚡ Installation de Deno dans ~/.deno/bin..."
+              curl -fsSL https://deno.land/install.sh | sh -s -- -y 2>/dev/null || true
+            fi
+            export PATH="$HOME/.deno/bin:$HOME/.local/bin:$PATH"
+
+            # 2b. S'assurer qu'un runtime Node.js est également disponible en alternative
             if ! command -v node &> /dev/null && [ ! -f "$HOME/.local/bin/node" ]; then
               echo "⚡ Installation autonome de Node.js dans ~/.local/bin..."
               mkdir -p "$HOME/.local/bin"
