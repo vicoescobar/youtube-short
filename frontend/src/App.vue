@@ -16,11 +16,21 @@
         </div>
       </div>
 
-      <div class="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
+      <div class="flex flex-wrap items-center gap-3 w-full md:w-auto justify-between md:justify-end">
         <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs">
           <span class="w-2 h-2 rounded-full" :class="apiConnected ? 'bg-emerald-400 animate-pulse' : 'bg-red-500'"></span>
-          <span class="text-slate-300">{{ apiConnected ? 'Serveur VPS en ligne' : 'Connexion en cours...' }}</span>
+          <span class="text-slate-300">{{ apiConnected ? 'Serveur VPS' : 'Connexion...' }}</span>
         </div>
+
+        <button 
+          @click="openCookiesModal"
+          class="flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs transition cursor-pointer font-medium"
+          :class="hasCookies ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20' : 'bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20 animate-pulse'"
+          title="Gérer les cookies YouTube anti-bot"
+        >
+          <span>🍪</span>
+          <span>{{ hasCookies ? 'Cookies : Actifs' : 'Cookies : Requis' }}</span>
+        </button>
 
         <button 
           v-if="shorts.length > 0"
@@ -135,8 +145,18 @@
           {{ activeJob.status }}
         </div>
       </div>
-      <div v-if="activeJob.error" class="mt-4 p-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">
-        ❌ {{ activeJob.error }}
+      <div v-if="activeJob.error" class="mt-4 p-4 rounded-xl bg-red-500/15 border border-red-500/30 text-red-200 text-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div class="flex items-center gap-2.5">
+          <span class="text-lg">⚠️</span>
+          <span>{{ activeJob.error }}</span>
+        </div>
+        <button 
+          v-if="!hasCookies || activeJob.error.includes('cookies') || activeJob.error.includes('bot')"
+          @click="openCookiesModal"
+          class="btn btn-primary text-xs px-3 py-1.5 whitespace-nowrap shadow-lg shrink-0"
+        >
+          🍪 Configurer les cookies
+        </button>
       </div>
     </section>
 
@@ -267,6 +287,90 @@
     >
       <span>✓</span> {{ toastMessage }}
     </div>
+    <!-- MODAL CONFIGURATION COOKIES YOUTUBE -->
+    <div v-if="showCookiesModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
+      <div class="glass-panel max-w-xl w-full p-6 relative border-purple-500/40 shadow-2xl">
+        <button 
+          @click="showCookiesModal = false"
+          class="absolute top-4 right-4 text-slate-400 hover:text-white text-base w-8 h-8 rounded-full flex items-center justify-center bg-white/5 hover:bg-white/10 transition"
+        >
+          ✕
+        </button>
+
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-10 h-10 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center text-xl">
+            🍪
+          </div>
+          <div>
+            <h3 class="text-lg font-bold text-white">Cookies YouTube (Anti-Bot VPS)</h3>
+            <p class="text-xs text-slate-400">Permet à yt-dlp de télécharger sans blocage depuis les adresses IP du VPS</p>
+          </div>
+        </div>
+
+        <!-- Explication guidée -->
+        <div class="p-4 rounded-xl bg-white/[0.03] border border-white/5 text-xs text-slate-300 space-y-2 mb-4">
+          <div class="font-semibold text-purple-300">Comment exporter vos cookies en 30 secondes :</div>
+          <ol class="list-decimal list-inside space-y-1.5 text-slate-400">
+            <li>Installez l'extension Chrome ou Firefox <a href="https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc" target="_blank" rel="noopener" class="text-purple-400 underline font-semibold">Get cookies.txt LOCALLY</a>.</li>
+            <li>Ouvrez <a href="https://youtube.com" target="_blank" rel="noopener" class="text-purple-400 underline font-semibold">youtube.com</a> (connecté à votre compte ou un compte secondaire).</li>
+            <li>Cliquez sur l'icône de l'extension et cliquez sur <strong>Export</strong> (télécharge un fichier <code class="text-purple-300">cookies.txt</code>).</li>
+            <li>Glissez ce fichier ci-dessous ou collez son contenu texte.</li>
+          </ol>
+        </div>
+
+        <!-- Zone de dépôt de fichier -->
+        <div 
+          @dragover.prevent="dragOver = true"
+          @dragleave.prevent="dragOver = false"
+          @drop.prevent="handleFileDrop"
+          class="border-2 border-dashed rounded-xl p-5 text-center transition cursor-pointer mb-4"
+          :class="dragOver ? 'border-purple-500 bg-purple-500/10' : 'border-white/10 hover:border-white/20 bg-white/[0.02]'"
+          @click="triggerFileInput"
+        >
+          <input type="file" ref="fileInput" @change="handleFileSelect" accept=".txt" class="hidden" />
+          <div class="text-2xl mb-1">📄</div>
+          <div class="text-sm font-semibold text-white">Glissez votre fichier cookies.txt ici</div>
+          <div class="text-xs text-slate-400 mt-1">ou cliquez pour parcourir vos dossiers</div>
+        </div>
+
+        <!-- Zone de collage manuel -->
+        <div class="mb-4">
+          <label class="block text-xs font-semibold text-slate-400 mb-1">Ou collez le contenu texte brut :</label>
+          <textarea 
+            v-model="cookiesInputText" 
+            rows="4" 
+            placeholder="# Netscape HTTP Cookie File&#10;.youtube.com TRUE / FALSE 1750000000 VISITOR_INFO1_LIVE ..."
+            class="input-field text-xs font-mono resize-none w-full"
+          ></textarea>
+        </div>
+
+        <!-- Actions & Statut -->
+        <div class="flex items-center justify-between gap-3 pt-3 border-t border-white/10">
+          <div class="text-xs">
+            <span v-if="cookiesStatus.configured" class="text-emerald-400 font-medium">✓ Actifs sur le serveur ({{ Math.round(cookiesStatus.file_size_bytes / 1024) }} Ko)</span>
+            <span v-else class="text-amber-400 font-medium">⚠️ Aucun cookie configuré</span>
+          </div>
+          <div class="flex gap-2">
+            <button 
+              v-if="cookiesStatus.configured" 
+              @click="removeCookies" 
+              type="button" 
+              class="btn btn-danger text-xs px-3 py-1.5"
+            >
+              Supprimer
+            </button>
+            <button 
+              @click="saveCookies" 
+              :disabled="savingCookies || !cookiesInputText.trim()" 
+              type="button" 
+              class="btn btn-primary text-xs px-4 py-1.5 font-bold"
+            >
+              {{ savingCookies ? 'Enregistrement...' : 'Enregistrer les cookies' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -281,6 +385,13 @@ const apiConnected = ref(false)
 const shorts = ref([])
 const activeJob = ref(null)
 const toastMessage = ref('')
+const hasCookies = ref(false)
+const showCookiesModal = ref(false)
+const cookiesInputText = ref('')
+const savingCookies = ref(false)
+const dragOver = ref(false)
+const fileInput = ref(null)
+const cookiesStatus = ref({ configured: false, file_size_bytes: 0 })
 
 let pollInterval = null
 
@@ -310,10 +421,96 @@ const checkHealth = async () => {
   try {
     const res = await fetch('/api/health')
     if (res.ok) {
+      const data = await res.json()
       apiConnected.value = true
+      hasCookies.value = Boolean(data.has_cookies)
     }
   } catch {
     apiConnected.value = false
+  }
+}
+
+// Récupérer le statut détaillé des cookies
+const fetchCookiesStatus = async () => {
+  try {
+    const res = await fetch('/api/cookies')
+    if (res.ok) {
+      const data = await res.json()
+      cookiesStatus.value = data
+      hasCookies.value = Boolean(data.configured)
+    }
+  } catch (err) {
+    console.error('Erreur chargement cookies status:', err)
+  }
+}
+
+const openCookiesModal = () => {
+  fetchCookiesStatus()
+  showCookiesModal.value = true
+}
+
+const triggerFileInput = () => {
+  if (fileInput.value) {
+    fileInput.value.click()
+  }
+}
+
+const handleFileSelect = (e) => {
+  const file = e.target.files?.[0]
+  if (file) readFileContent(file)
+}
+
+const handleFileDrop = (e) => {
+  dragOver.value = false
+  const file = e.dataTransfer?.files?.[0]
+  if (file) readFileContent(file)
+}
+
+const readFileContent = (file) => {
+  const reader = new FileReader()
+  reader.onload = (event) => {
+    cookiesInputText.value = event.target?.result || ''
+    showToast(`Fichier ${file.name} chargé (${Math.round(file.size / 1024)} Ko)`)
+  }
+  reader.readAsText(file)
+}
+
+const saveCookies = async () => {
+  if (!cookiesInputText.value.trim()) return
+  savingCookies.value = true
+  try {
+    const res = await fetch('/api/cookies', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: cookiesInputText.value })
+    })
+    if (res.ok) {
+      showToast('Cookies YouTube enregistrés avec succès !')
+      cookiesInputText.value = ''
+      await fetchCookiesStatus()
+      showCookiesModal.value = false
+    } else {
+      const data = await res.json()
+      showToast('Erreur : ' + (data.detail || 'Impossible d enregistrer'))
+    }
+  } catch (err) {
+    showToast('Erreur réseau lors de l enregistrement')
+  } finally {
+    savingCookies.value = false
+  }
+}
+
+const removeCookies = async () => {
+  if (!confirm('Supprimer les cookies YouTube du serveur ?')) return
+  try {
+    const res = await fetch('/api/cookies', { method: 'DELETE' })
+    if (res.ok) {
+      showToast('Cookies supprimés')
+      await fetchCookiesStatus()
+      cookiesInputText.value = ''
+    }
+  } catch {
+    showToast('Erreur suppression cookies')
   }
 }
 
@@ -429,6 +626,7 @@ const purgeAll = async () => {
 onMounted(() => {
   checkHealth()
   fetchShorts()
+  fetchCookiesStatus()
   pollInterval = setInterval(() => {
     pollJobStatus()
     checkHealth()

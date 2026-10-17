@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from src.config import OUTPUT_DIR, TEMP_DIR, GEMINI_API_KEY
+from src.config import OUTPUT_DIR, TEMP_DIR, GEMINI_API_KEY, COOKIES_FILE, has_youtube_cookies
 from src.extractor import get_video_metadata, extract_transcript, format_timestamp
 from src.analyzer import analyze_video_for_viral_clips
 from src.clipper import (
@@ -39,6 +39,10 @@ class AnalyzeRequest(BaseModel):
     url: str
     crop_mode: str = "crop" # "crop" ou "blur"
     auto_render: bool = True
+
+class CookiesPayload(BaseModel):
+    content: str
+
 
 def run_pipeline_task(job_id: str, url: str, crop_mode: str, auto_render: bool):
     """Tâche d'arrière-plan exécutant l'extraction, l'analyse et le rendu optionnel"""
@@ -125,9 +129,13 @@ def run_pipeline_task(job_id: str, url: str, crop_mode: str, auto_render: bool):
         job["updated_at"] = datetime.now().isoformat()
 
     except Exception as e:
+        err_msg = str(e)
+        if "Sign in to confirm you’re not a bot" in err_msg or "confirm you're not a bot" in err_msg.lower():
+            err_msg = "YouTube exige une authentification (protection anti-bot VPS). Veuillez renseigner vos cookies YouTube via le bouton 'Cookies YouTube' en haut de la page."
+        
         job["status"] = "failed"
-        job["error"] = str(e)
-        job["step"] = f"Erreur : {e}"
+        job["error"] = err_msg
+        job["step"] = f"Erreur : {err_msg}"
         job["updated_at"] = datetime.now().isoformat()
 
 def delete_short_files(short_id: str):
@@ -146,9 +154,49 @@ def health():
     return {
         "status": "ok",
         "has_gemini_key": bool(GEMINI_API_KEY and "your_gemini_api_key_here" not in GEMINI_API_KEY),
+        "has_cookies": has_youtube_cookies(),
         "output_dir": str(OUTPUT_DIR),
         "total_shorts": len(list(OUTPUT_DIR.glob("*.json")))
     }
+
+@app.get("/api/cookies")
+def get_cookies_status():
+    """Vérifie l'état actuel des cookies YouTube sur le serveur"""
+    configured = has_youtube_cookies()
+    file_size = COOKIES_FILE.stat().st_size if configured else 0
+    modified_at = datetime.fromtimestamp(COOKIES_FILE.stat().st_mtime).isoformat() if configured else None
+    return {
+        "configured": configured,
+        "file_path": str(COOKIES_FILE.name),
+        "file_size_bytes": file_size,
+        "modified_at": modified_at,
+    }
+
+@app.post("/api/cookies")
+def save_cookies(payload: CookiesPayload):
+    """Enregistre le contenu d'un fichier cookies.txt envoyé depuis le tableau de bord"""
+    raw_content = payload.content.strip()
+    if not raw_content:
+        raise HTTPException(status_code=400, detail="Le contenu des cookies ne peut pas être vide")
+    
+    try:
+        COOKIES_FILE.write_text(raw_content, encoding="utf-8")
+        return {
+            "status": "success",
+            "message": "Cookies YouTube enregistrés avec succès !",
+            "size": len(raw_content),
+            "configured": True
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur d'enregistrement : {e}")
+
+@app.delete("/api/cookies")
+def delete_cookies():
+    """Supprime le fichier de cookies actuel"""
+    if COOKIES_FILE.exists():
+        COOKIES_FILE.unlink()
+    return {"status": "deleted", "configured": False}
+
 
 @app.post("/api/analyze")
 def start_analysis(req: AnalyzeRequest, background_tasks: BackgroundTasks):

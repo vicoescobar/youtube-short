@@ -6,7 +6,7 @@ import yt_dlp
 from yt_dlp.utils import download_range_func
 from rich.console import Console
 
-from src.config import TEMP_DIR, OUTPUT_DIR
+from src.config import TEMP_DIR, OUTPUT_DIR, get_base_ydl_opts
 from src.models import TranscriptSegment, ViralClipRecommendation
 from src.tracker import compute_smart_crop_expression
 
@@ -92,12 +92,11 @@ def download_video_segment(
     console.print(f"[cyan]Téléchargement ciblé du segment [{start_time:.2f}s -> {end_time:.2f}s]...[/cyan]")
 
     ydl_opts = {
+        **get_base_ydl_opts(),
         'format': 'bestvideo[vcodec^=avc1][height<=1080]+bestaudio[ext=m4a]/bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080]/best',
         'outtmpl': str(output_raw_video),
         'download_ranges': download_range_func(None, [(start_time, end_time)]),
         'force_keyframes_at_cuts': False,
-        'quiet': True,
-        'no_warnings': True,
     }
 
     if output_raw_video.exists():

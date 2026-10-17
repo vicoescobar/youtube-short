@@ -50,6 +50,8 @@ jobs:
             --exclude '.env' \
             --exclude 'output' \
             --exclude 'temp' \
+            --exclude 'cookies.txt' \
+            --exclude '*cookies*.txt' \
             --exclude 'frontend/node_modules' \
             -e "ssh -p $SSH_PORT -o StrictHostKeyChecking=accept-new" \
             ./ "$SSH_USER@$SSH_HOST:$TARGET_DIR"

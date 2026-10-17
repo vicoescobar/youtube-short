@@ -9,7 +9,7 @@ from typing import List, Optional, Tuple
 import yt_dlp
 from rich.console import Console
 
-from src.config import TEMP_DIR, GROQ_API_KEY
+from src.config import TEMP_DIR, GROQ_API_KEY, get_base_ydl_opts
 from src.models import TranscriptSegment, VideoMetadata
 
 console = Console()
@@ -26,9 +26,8 @@ def format_timestamp(seconds: float) -> str:
 def get_video_metadata(url: str) -> VideoMetadata:
     """Récupère les informations de base de la vidéo sans rien télécharger"""
     ydl_opts = {
+        **get_base_ydl_opts(),
         'skip_download': True,
-        'quiet': True,
-        'no_warnings': True,
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=False)
@@ -98,14 +97,13 @@ def _extract_youtube_subtitles(url: str, video_id: str) -> Optional[List[Transcr
     sub_tmpl = str(TEMP_DIR / f"{video_id}_sub.%(ext)s")
     
     ydl_opts = {
+        **get_base_ydl_opts(),
         'skip_download': True,
         'writesubtitles': True,
         'writeautomaticsub': True,
         'subtitleslangs': ['fr', 'en', 'auto'],
         'subtitlesformat': 'json3/vtt',
         'outtmpl': sub_tmpl,
-        'quiet': True,
-        'no_warnings': True,
     }
     
     try:
@@ -252,6 +250,7 @@ def extract_transcript(url: str, metadata: VideoMetadata) -> List[TranscriptSegm
     audio_path = TEMP_DIR / f"{metadata.video_id}.mp3"
     
     ydl_opts = {
+        **get_base_ydl_opts(),
         'format': 'bestaudio[ext=m4a]/bestaudio/best',
         'outtmpl': str(TEMP_DIR / f"{metadata.video_id}.%(ext)s"),
         'postprocessors': [{
@@ -260,8 +259,6 @@ def extract_transcript(url: str, metadata: VideoMetadata) -> List[TranscriptSegm
             'preferredquality': '48', # 48 kbps mono pour minimiser la taille
         }],
         'postprocessor_args': ['-ac', '1'], # Forcer mono pour diviser la taille par 2
-        'quiet': True,
-        'no_warnings': True,
     }
     
     try:

@@ -11,3 +11,8 @@ temp/
 *.srt
 *.ass
 .DS_Store
+cookies.txt
+*cookies*.txt
+app.log
+app.pid
+
