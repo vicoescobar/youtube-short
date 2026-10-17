@@ -1,4 +1,4 @@
-name: CI/CD Auto-Deploy to VPS
+name: CI/CD Auto-Deploy to VPS (Native)
 
 on:
   push:
@@ -14,18 +14,23 @@ jobs:
       - name: Déploiement automatique via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT || 22 }}
+          host: ${{ secrets.SSH_HOST || secrets.VPS_HOST }}
+          username: ${{ secrets.SSH_USER || secrets.VPS_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY || secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || secrets.VPS_PORT || 22 }}
           script_stop: true
           script: |
+            # 1. Charger tous les chemins possibles dans le PATH
+            export PATH="$HOME/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
+
             echo "🚀 Démarrage du déploiement sur le VPS..."
+            echo "👤 Utilisateur connecté : $(whoami)"
 
-            # Définir le dossier cible
-            PROJECT_DIR="$HOME/youtube-short"
+            # 2. Définir le dossier cible à partir du secret SSH_TARGET_DIR
+            PROJECT_DIR="${{ secrets.SSH_TARGET_DIR || '/home/victor-giroud-ytshorts/youtube-short' }}"
+            echo "📁 Dossier de déploiement : $PROJECT_DIR"
 
-            # Cloner si le dossier n'existe pas encore
+            # 3. Cloner le projet si nécessaire
             if [ ! -d "$PROJECT_DIR" ]; then
               echo "📦 Premier déploiement : Clonage du dépôt..."
               git clone https://github.com/${{ github.repository }}.git "$PROJECT_DIR"
@@ -33,24 +38,48 @@ jobs:
 
             cd "$PROJECT_DIR"
 
-            # Récupérer les dernières modifications de la branche main
-            echo "📥 Récupération des dernières modifications..."
+            # 4. Mettre à jour le code depuis main
+            echo "📥 Mise à jour du code..."
             git fetch origin main
             git reset --hard origin/main
 
-            # S'assurer que le fichier .env existe
+            # 5. S'assurer de la présence du fichier .env
             if [ ! -f .env ]; then
-              echo "⚠️ Fichier .env manquant. Copie de .env.example..."
+              echo "⚠️ Fichier .env manquant. Création depuis .env.example..."
               cp .env.example .env
-              echo "Pensez à éditer $PROJECT_DIR/.env avec vos clés API."
             fi
 
-            # Construire et démarrer les conteneurs Docker
-            echo "🐳 Build et démarrage des conteneurs Docker..."
-            docker compose up -d --build
+            # 6. S'assurer que uv est installé (ultra-rapide, sans root)
+            if ! command -v uv &> /dev/null; then
+              echo "⚡ Installation de uv..."
+              curl -LsSf https://astral.sh/uv/install.sh | sh
+              export PATH="$HOME/.local/bin:$PATH"
+            fi
 
-            # Nettoyage des images Docker orphelines pour économiser le SSD du VPS (40 Go)
-            echo "🧹 Nettoyage des anciennes images Docker..."
-            docker image prune -f
+            # 7. Synchroniser les dépendances Python
+            echo "🐍 Installation / mise à jour des dépendances Python..."
+            uv sync --no-dev
 
-            echo "✅ Déploiement terminé avec succès !"
+            # 8. Build du frontend Vue 3
+            if command -v npm &> /dev/null; then
+              echo "🎨 Build du frontend Vue 3..."
+              cd frontend
+              npm install
+              npm run build
+              cd ..
+            fi
+
+            # 9. Relancer le serveur FastAPI sur le port 8000
+            echo "🔄 Redémarrage du serveur FastAPI..."
+            if command -v pm2 &> /dev/null; then
+              pm2 restart shorts-studio 2>/dev/null || pm2 start "uv run uvicorn src.api:app --host 127.0.0.1 --port 8000" --name shorts-studio
+              pm2 save
+            else
+              # Fallback avec gestion de processus propre (nohup & pid)
+              pkill -u $(whoami) -f "uvicorn src.api:app" 2>/dev/null || true
+              sleep 1
+              nohup uv run uvicorn src.api:app --host 127.0.0.1 --port 8000 > app.log 2>&1 &
+              echo $! > app.pid
+            fi
+
+            echo "✅ Déploiement terminé avec succès ! Le serveur écoute sur 127.0.0.1:8000."
