@@ -79,7 +79,7 @@ def get_base_ydl_opts() -> dict:
         "no_warnings": True,
         "extractor_args": {
             "youtube": {
-                "player_client": ["web", "web_embedded", "mweb", "-tv_downgraded"]
+                "player_client": ["default", "-tv_downgraded"]
             }
         }
     }

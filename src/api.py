@@ -158,11 +158,22 @@ def delete_short_files(short_id: str):
 
 @app.get("/api/health")
 def health():
+    js_rt = find_js_runtime()
+    node_exec = {}
+    if "node" in js_rt and "path" in js_rt["node"]:
+        try:
+            import subprocess
+            r = subprocess.run([js_rt["node"]["path"], "-v"], capture_output=True, text=True, timeout=5)
+            node_exec = {"ok": r.returncode == 0, "stdout": r.stdout.strip(), "stderr": r.stderr.strip()}
+        except Exception as ex:
+            node_exec = {"error": str(ex)}
+
     return {
         "status": "ok",
         "has_gemini_key": bool(GEMINI_API_KEY and "your_gemini_api_key_here" not in GEMINI_API_KEY),
         "has_cookies": has_youtube_cookies(),
-        "js_runtime": find_js_runtime(),
+        "js_runtime": js_rt,
+        "node_exec": node_exec,
         "output_dir": str(OUTPUT_DIR),
         "total_shorts": len(list(OUTPUT_DIR.glob("*.json")))
     }
