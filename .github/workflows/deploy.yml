@@ -91,12 +91,13 @@ jobs:
               chmod +x "$HOME/.local/bin/node" 2>/dev/null || true
             fi
 
-            # 3. S'assurer que FFmpeg et ffprobe sont présents pour la fusion et le découpage audio/vidéo
-            if ! command -v ffmpeg &> /dev/null && [ ! -f "$HOME/.local/bin/ffmpeg" ]; then
-              echo "⚡ Installation autonome de FFmpeg dans ~/.local/bin..."
-              mkdir -p "$HOME/.local/bin"
-              curl -fsSL https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz | tar -xJ -C "$HOME/.local/bin" --strip-components=1 2>/dev/null || true
+            # 3. S'assurer que FFmpeg et ffprobe modernes (build officiel BtbN recommandé par yt-dlp) sont présents
+            mkdir -p "$HOME/.local/bin"
+            if [ ! -f "$HOME/.local/bin/ffmpeg_btbn_installed" ]; then
+              echo "⚡ Installation de FFmpeg moderne (BtbN) dans ~/.local/bin..."
+              curl -fsSL https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz | tar -xJ -C "$HOME/.local/bin" --strip-components=2 ffmpeg-master-latest-linux64-gpl/bin/ffmpeg ffmpeg-master-latest-linux64-gpl/bin/ffprobe 2>/dev/null || true
               chmod +x "$HOME/.local/bin/ffmpeg" "$HOME/.local/bin/ffprobe" 2>/dev/null || true
+              touch "$HOME/.local/bin/ffmpeg_btbn_installed"
             fi
 
             # 4. Synchroniser les dépendances Python dans l'environnement virtuel

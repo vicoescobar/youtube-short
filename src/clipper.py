@@ -97,7 +97,6 @@ def download_video_segment(
         'format': 'bestvideo[vcodec^=avc1][height<=1080]+bestaudio[ext=m4a]/bestvideo[height<=1080]+bestaudio/bestvideo+bestaudio/best',
         'outtmpl': str(output_raw_video),
         'download_ranges': download_range_func(None, [(start_time, end_time)]),
-        'force_keyframes_at_cuts': False,
     }
 
     if output_raw_video.exists():
