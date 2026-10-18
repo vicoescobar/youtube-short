@@ -17,7 +17,7 @@ console = Console()
 
 ANALYSIS_SYSTEM_INSTRUCTION = """
 Tu es le meilleur expert mondial en stratégie de contenu court (YouTube Shorts, TikTok, Instagram Reels).
-Ton objectif est d'analyser la transcription complète d'une vidéo YouTube (avec ses timestamps) pour identifier les 1 à 3 MEILLEURS moments viraux (entre 30 et 60 secondes).
+Ton objectif est d'analyser la transcription complète d'une vidéo YouTube (avec ses timestamps) pour identifier les MEILLEURS moments viraux (entre 30 et 60 secondes, dans la limite du nombre maximum demandé). Si la vidéo ne contient pas assez de contenu captivant, retiens uniquement les extraits de haute qualité (entre 1 et le maximum demandé).
 
 Règles impératives de détection :
 1. LE HOOK (L'ACCROCHE) : Le clip DOIT démarrer immédiatement à 00:00 par une phrase choc, une question intrigante, un désaccord, une émotion forte ou une punchline. JAMAIS de transition molle, de "bonjour à tous" ou de blanc.
@@ -31,10 +31,11 @@ Règles impératives de détection :
 def analyze_video_for_viral_clips(
     metadata: VideoMetadata,
     segments: List[TranscriptSegment],
-    model_name: str = "gemini-3.8-flash"
+    model_name: str = "gemini-2.5-flash",
+    max_clips: int = 3
 ) -> ViralAnalysisResult:
     """
-    Envoie la transcription horodatée à Gemini pour repérer les moments viraux.
+    Envoie la transcription horodatée à Gemini pour repérer les moments viraux (jusqu'à max_clips).
     """
     if not GEMINI_API_KEY:
         raise ValueError(
@@ -58,10 +59,12 @@ Voici la transcription intégrale avec les timestamps :
 {formatted_transcript}
 ---
 
-Identifie les 1 à 3 extraits les plus captivants et viraux respectant les critères stricts de durée (30s à 60s) et de rétention.
+Identifie les {max_clips} meilleurs extraits viraux possibles (entre 1 et {max_clips} extraits selon la richesse et la durée du contenu).
+Chaque extrait doit impérativement respecter les critères stricts de durée (30s à 60s) et de rétention.
+Ne force pas de clips de faible intérêt : retiens uniquement les moments qui ont un vrai potentiel viral (au maximum {max_clips} extraits).
 """
 
-    console.print(f"[cyan]Analyse virale en cours avec Gemini ({model_name})...[/cyan]")
+    console.print(f"[cyan]Analyse virale en cours avec Gemini ({model_name}) pour {max_clips} shorts max...[/cyan]")
 
     import time
     last_err = None
@@ -88,7 +91,7 @@ Identifie les 1 à 3 extraits les plus captivants et viraux respectant les crit�
                 continue
             if "not found" in err_str and model_name != "gemini-2.0-flash":
                 console.print(f"[yellow]Modèle {model_name} indisponible, bascule sur gemini-2.0-flash...[/yellow]")
-                return analyze_video_for_viral_clips(metadata, segments, model_name="gemini-2.0-flash")
+                return analyze_video_for_viral_clips(metadata, segments, model_name="gemini-2.0-flash", max_clips=max_clips)
             raise e
     else:
         if last_err:
@@ -100,6 +103,10 @@ Identifie les 1 à 3 extraits les plus captivants et viraux respectant les crit�
 
     data = json.loads(result_text)
     result = ViralAnalysisResult.model_validate(data)
+
+    # Limiter strictement au nombre maximal demandé
+    if len(result.clips) > max_clips:
+        result.clips = result.clips[:max_clips]
 
     # Recalage chirurgical des timestamps sur les débuts et fins de phrase réels
     for clip in result.clips:

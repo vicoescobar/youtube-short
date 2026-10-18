@@ -110,9 +110,39 @@
               />
               <div>
                 <div class="toggle-text-main">Génération automatique</div>
-                <div class="toggle-text-sub">Rendu immédiat des 3 meilleurs clips détectés</div>
+                <div class="toggle-text-sub">Rendu immédiat des clips détectés (jusqu'à {{ maxShorts }})</div>
               </div>
             </label>
+          </div>
+
+          <!-- Curseur Nombre de Shorts (1 à 15) -->
+          <div class="option-box slider-box">
+            <div class="slider-header">
+              <span class="option-label">Nombre max de Shorts</span>
+              <span class="slider-value-pill">
+                <strong>{{ maxShorts }}</strong> short{{ maxShorts > 1 ? 's' : '' }} max
+              </span>
+            </div>
+            <div class="slider-wrapper">
+              <input 
+                type="range" 
+                min="1" 
+                max="15" 
+                step="1" 
+                v-model.number="maxShorts" 
+                class="range-slider"
+              />
+              <div class="slider-marks">
+                <span>1</span>
+                <span>3</span>
+                <span>5</span>
+                <span>10</span>
+                <span>15 max</span>
+              </div>
+            </div>
+            <div class="slider-hint">
+              L'IA détectera et générera entre 0 et {{ maxShorts }} clip{{ maxShorts > 1 ? 's' : '' }} selon la pertinence et la durée de la vidéo.
+            </div>
           </div>
         </div>
 
@@ -415,6 +445,7 @@ import { ref, onMounted, onUnmounted } from 'vue'
 const videoUrl = ref('')
 const cropMode = ref('crop')
 const autoRender = ref(true)
+const maxShorts = ref(3)
 const loading = ref(false)
 const apiConnected = ref(false)
 const shorts = ref([])
@@ -600,7 +631,8 @@ const submitAnalysis = async () => {
       body: JSON.stringify({
         url: videoUrl.value,
         crop_mode: cropMode.value,
-        auto_render: autoRender.value
+        auto_render: autoRender.value,
+        max_shorts: maxShorts.value
       })
     })
 

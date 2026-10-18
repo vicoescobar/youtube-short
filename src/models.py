@@ -29,6 +29,6 @@ class ViralClipRecommendation(BaseModel):
 class ViralAnalysisResult(BaseModel):
     """Résultat complet de l'analyse d'une vidéo"""
     clips: List[ViralClipRecommendation] = Field(
-        ..., 
-        description="Liste des 1 à 3 meilleurs extraits de 30 à 60 secondes classés par score de viralité"
+        default_factory=list,
+        description="Liste des meilleurs extraits de 30 à 60 secondes classés par score de viralité décroissant (jusqu'au nombre maximum demandé)"
     )

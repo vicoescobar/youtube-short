@@ -41,6 +41,7 @@ class AnalyzeRequest(BaseModel):
     url: str
     crop_mode: str = "crop" # "crop" ou "blur"
     auto_render: bool = True
+    max_shorts: int = Field(default=3, ge=1, le=15)
 
 class CookiesPayload(BaseModel):
     content: str
@@ -49,7 +50,7 @@ class CookieTestRequest(BaseModel):
     url: Optional[str] = None
 
 
-def run_pipeline_task(job_id: str, url: str, crop_mode: str, auto_render: bool):
+def run_pipeline_task(job_id: str, url: str, crop_mode: str, auto_render: bool, max_shorts: int = 3):
     """Tâche d'arrière-plan exécutant l'extraction, l'analyse et le rendu optionnel"""
     job = jobs[job_id]
     try:
@@ -73,9 +74,9 @@ def run_pipeline_task(job_id: str, url: str, crop_mode: str, auto_render: bool):
         if not segments:
             raise ValueError("Impossible d'extraire la transcription de cette vidéo.")
 
-        job["step"] = "Analyse des moments viraux par Gemini..."
+        job["step"] = f"Analyse des moments viraux par Gemini (max {max_shorts} shorts)..."
         job["updated_at"] = datetime.now().isoformat()
-        analysis = analyze_video_for_viral_clips(metadata, segments)
+        analysis = analyze_video_for_viral_clips(metadata, segments, max_clips=max_shorts)
 
         job["clips"] = [clip.model_dump() for clip in analysis.clips]
 
@@ -300,6 +301,8 @@ def start_analysis(req: AnalyzeRequest, background_tasks: BackgroundTasks):
         "id": job_id,
         "url": req.url,
         "crop_mode": req.crop_mode,
+        "auto_render": req.auto_render,
+        "max_shorts": req.max_shorts,
         "status": "queued",
         "step": "En file d'attente...",
         "created_at": datetime.now().isoformat(),
@@ -313,7 +316,8 @@ def start_analysis(req: AnalyzeRequest, background_tasks: BackgroundTasks):
         job_id=job_id,
         url=req.url,
         crop_mode=req.crop_mode,
-        auto_render=req.auto_render
+        auto_render=req.auto_render,
+        max_shorts=req.max_shorts
     )
 
     return {"job_id": job_id, "status": "queued"}

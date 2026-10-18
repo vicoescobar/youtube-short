@@ -1,7 +1,7 @@
 import subprocess
 import os
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Tuple
 import yt_dlp
 from yt_dlp.utils import download_range_func
 from rich.console import Console
@@ -23,6 +23,61 @@ def to_ass_timestamp(seconds: float) -> str:
         csecs = 99
     return f"{hrs}:{mins:02d}:{secs:02d}.{csecs:02d}"
 
+def chunk_text_into_short_phrases(
+    text: str,
+    seg_start: float,
+    seg_end: float,
+    max_words: int = 4,
+    max_chars: int = 24
+) -> List[Tuple[float, float, str]]:
+    """
+    Découpe un texte long en courtes séquences de 2 à 4 mots (style TikTok/Shorts dynamique)
+    et répartit les timestamps proportionnellement à la longueur des caractères.
+    Évite l'apparition de gros pavés de texte encombrants à l'écran.
+    """
+    words = text.split()
+    if not words:
+        return []
+
+    # Si le texte est déjà très court, conserver tel quel
+    if len(words) <= max_words and len(text) <= max_chars:
+        return [(seg_start, seg_end, text)]
+
+    chunks = []
+    current_chunk = []
+    current_char_len = 0
+
+    for word in words:
+        extra = len(word) + (1 if current_chunk else 0)
+        if current_chunk and (len(current_chunk) >= max_words or (current_char_len + extra) > max_chars):
+            chunks.append(" ".join(current_chunk))
+            current_chunk = [word]
+            current_char_len = len(word)
+        else:
+            current_chunk.append(word)
+            current_char_len += extra
+
+    if current_chunk:
+        chunks.append(" ".join(current_chunk))
+
+    if not chunks:
+        return []
+
+    total_duration = max(0.01, seg_end - seg_start)
+    total_chars = max(1, sum(len(c) for c in chunks))
+
+    timed_chunks = []
+    curr_start = seg_start
+    for i, c in enumerate(chunks):
+        ratio = len(c) / total_chars
+        duration = total_duration * ratio
+        c_end = seg_end if i == len(chunks) - 1 else curr_start + duration
+        if c_end > curr_start:
+            timed_chunks.append((curr_start, c_end, c))
+        curr_start = c_end
+
+    return timed_chunks
+
 def generate_ass_subtitles(
     segments: List[TranscriptSegment],
     clip_start: float,
@@ -33,7 +88,7 @@ def generate_ass_subtitles(
     Génère un fichier de sous-titres ASS stylisé pour YouTube Shorts (9:16).
     - Texte en gras, jaune éclatant avec contour noir épais
     - Positionné au tiers inférieur (au-dessus des boutons de l'interface YouTube Shorts)
-    - Découpage par phrases courtes pour maximiser la rétention visuelle.
+    - Découpage dynamique en courtes séquences (2 à 4 mots max) pour un rendu moderne et percutant.
     """
     ass_header = """[Script Info]
 Title: YouTube Shorts Subtitles
@@ -65,15 +120,19 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         if seg_end <= seg_start:
             continue
 
-        text = s.text.strip().upper()
+        raw_text = s.text.strip().upper()
         # Échappement des caractères spéciaux ASS
-        text = text.replace("{", "\\{").replace("}", "\\}")
+        raw_text = raw_text.replace("{", "\\{").replace("}", "\\}")
 
-        start_str = to_ass_timestamp(seg_start)
-        end_str = to_ass_timestamp(seg_end)
-        dialogues.append(
-            f"Dialogue: 0,{start_str},{end_str},ViralStyle,,0,0,0,,{text}"
-        )
+        # Découpage en phrases courtes de 2 à 4 mots maximum
+        short_phrases = chunk_text_into_short_phrases(raw_text, seg_start, seg_end, max_words=4, max_chars=24)
+
+        for c_start, c_end, c_text in short_phrases:
+            start_str = to_ass_timestamp(c_start)
+            end_str = to_ass_timestamp(c_end)
+            dialogues.append(
+                f"Dialogue: 0,{start_str},{end_str},ViralStyle,,0,0,0,,{c_text}"
+            )
 
     with open(output_ass_path, "w", encoding="utf-8") as f:
         f.write(ass_header)
