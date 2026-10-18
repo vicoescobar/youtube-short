@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from src.config import OUTPUT_DIR, TEMP_DIR, GEMINI_API_KEY, COOKIES_FILE, has_youtube_cookies, get_base_ydl_opts, run_ydl_with_fallback, find_js_runtime, find_ffmpeg_location
+from src.config import BASE_DIR, OUTPUT_DIR, TEMP_DIR, GEMINI_API_KEY, COOKIES_FILE, has_youtube_cookies, get_base_ydl_opts, run_ydl_with_fallback, find_js_runtime, find_ffmpeg_location
 from src.extractor import get_video_metadata, extract_transcript, format_timestamp, sanitize_youtube_url
 from src.analyzer import analyze_video_for_viral_clips
 from src.clipper import (
@@ -281,6 +281,14 @@ def test_youtube_connection(req: CookieTestRequest):
             "ydl_opts": {k: str(v) for k, v in ydl_opts.items() if k != "cookiefile"}
         }
 
+
+@app.get("/api/logs")
+def get_server_logs(n: int = 60):
+    log_file = BASE_DIR / "app.log"
+    if log_file.exists():
+        lines = log_file.read_text(encoding="utf-8", errors="replace").splitlines()
+        return {"logs": lines[-n:]}
+    return {"logs": []}
 
 @app.post("/api/analyze")
 def start_analysis(req: AnalyzeRequest, background_tasks: BackgroundTasks):
