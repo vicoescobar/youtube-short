@@ -1,41 +1,42 @@
 <template>
-  <div class="min-h-screen p-4 md:p-8 max-w-7xl mx-auto">
-    <!-- HEADER -->
-    <header class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8 pb-6 border-b border-white/10">
-      <div>
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-cyan-500 flex items-center justify-center text-xl shadow-lg shadow-purple-500/30">
-            🎬
-          </div>
-          <div>
-            <h1 class="text-2xl md:text-3xl font-extrabold tracking-tight text-white flex items-center gap-2">
-              Shorts Studio <span class="text-xs px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 font-semibold">IA v1.0</span>
-            </h1>
-            <p class="text-sm text-slate-400">Automatisation de clips viraux 9:16 avec Face-Tracking & Sous-titres dynamiques</p>
-          </div>
+  <div class="app-container">
+    <!-- HEADER & NAVBAR -->
+    <header class="header-bar">
+      <div class="brand-wrapper">
+        <div class="brand-icon-box">
+          🎬
+        </div>
+        <div class="brand-title-wrap">
+          <h1 class="brand-title">
+            Shorts Studio <span class="version-tag">IA v1.0</span>
+          </h1>
+          <p class="brand-subtitle">Automatisation de clips viraux 9:16 avec Face-Tracking & Sous-titres dynamiques</p>
         </div>
       </div>
 
-      <div class="flex flex-wrap items-center gap-3 w-full md:w-auto justify-between md:justify-end">
-        <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs">
-          <span class="w-2 h-2 rounded-full" :class="apiConnected ? 'bg-emerald-400 animate-pulse' : 'bg-red-500'"></span>
-          <span class="text-slate-300">{{ apiConnected ? 'Serveur VPS' : 'Connexion...' }}</span>
+      <div class="header-actions">
+        <!-- Statut VPS -->
+        <div class="status-pill">
+          <span class="status-dot" :class="apiConnected ? 'online' : 'offline'"></span>
+          <span>{{ apiConnected ? 'Serveur VPS En Ligne' : 'Connexion...' }}</span>
         </div>
 
+        <!-- Bouton Cookies YouTube -->
         <button 
           @click="openCookiesModal"
-          class="flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs transition cursor-pointer font-medium"
-          :class="hasCookies ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20' : 'bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20 animate-pulse'"
+          class="cookie-status-btn"
+          :class="hasCookies ? 'active' : 'warning'"
           title="Gérer les cookies YouTube anti-bot"
         >
           <span>🍪</span>
           <span>{{ hasCookies ? 'Cookies : Actifs' : 'Cookies : Requis' }}</span>
         </button>
 
+        <!-- Purge globale -->
         <button 
           v-if="shorts.length > 0"
           @click="purgeAll"
-          class="btn btn-danger text-xs px-3 py-1.5"
+          class="btn btn-danger btn-sm"
           title="Supprime tous les shorts sur le VPS pour libérer le disque"
         >
           🗑️ Tout purger
@@ -43,117 +44,121 @@
       </div>
     </header>
 
-    <!-- FORMULAIRE DE CRÉATION -->
-    <section class="glass-panel p-6 md:p-8 mb-8 relative overflow-hidden">
-      <div class="max-w-3xl">
-        <h2 class="text-xl font-bold text-white mb-2 flex items-center gap-2">
-          ✨ Créer de nouveaux Shorts
-        </h2>
-        <p class="text-sm text-slate-400 mb-6">
-          Colle l'URL d'une vidéo YouTube (podcast, interview, divertissement). L'IA détecte les moments viraux et les découpe au format vertical 9:16.
-        </p>
+    <!-- FORMULAIRE DE CRÉATION DE SHORTS -->
+    <section class="glass-panel hero-creation">
+      <h2 class="section-title">
+        ✨ Créer de nouveaux Shorts
+      </h2>
+      <p class="section-desc">
+        Colle l'URL d'une vidéo YouTube (podcast, interview, divertissement). L'IA détecte les moments viraux et les découpe au format vertical 9:16.
+      </p>
 
-        <form @submit.prevent="submitAnalysis" class="space-y-4">
-          <div class="relative">
-            <input
-              v-model="videoUrl"
-              type="url"
-              placeholder="https://www.youtube.com/watch?v=..."
-              required
-              class="input-field text-base pl-4 pr-24"
-              :disabled="loading"
-            />
-            <button 
-              type="button" 
-              @click="pasteUrl"
-              class="absolute right-2 top-2 px-3 py-1.5 text-xs text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-md border border-white/10 transition"
-            >
-              Coller
-            </button>
-          </div>
-
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-            <!-- Mode de cadrage -->
-            <div class="p-4 rounded-xl bg-white/[0.03] border border-white/5">
-              <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
-                Format Vertical
-              </label>
-              <div class="flex gap-2">
-                <button
-                  type="button"
-                  @click="cropMode = 'crop'"
-                  :class="cropMode === 'crop' ? 'btn-primary' : 'btn-secondary'"
-                  class="btn text-xs flex-1"
-                >
-                  🎯 Plein écran (Face-Track)
-                </button>
-                <button
-                  type="button"
-                  @click="cropMode = 'blur'"
-                  :class="cropMode === 'blur' ? 'btn-primary' : 'btn-secondary'"
-                  class="btn text-xs flex-1"
-                >
-                  🌫️ Fond Flouté
-                </button>
-              </div>
-            </div>
-
-            <!-- Options auto -->
-            <div class="p-4 rounded-xl bg-white/[0.03] border border-white/5 flex flex-col justify-center">
-              <label class="flex items-center gap-3 cursor-pointer">
-                <input 
-                  type="checkbox" 
-                  v-model="autoRender" 
-                  class="w-4 h-4 rounded text-purple-600 focus:ring-purple-500 bg-slate-900 border-white/20"
-                />
-                <div>
-                  <div class="text-sm font-semibold text-white">Génération automatique</div>
-                  <div class="text-xs text-slate-400">Rendu immédiat des 3 meilleurs clips détectés</div>
-                </div>
-              </label>
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            :disabled="loading || !videoUrl"
-            class="btn btn-primary w-full py-4 text-base font-bold flex items-center justify-center gap-2 mt-4"
+      <form @submit.prevent="submitAnalysis" class="creation-form">
+        <!-- Champ URL -->
+        <div class="input-group">
+          <span class="input-icon">🔗</span>
+          <input
+            v-model="videoUrl"
+            type="url"
+            placeholder="https://www.youtube.com/watch?v=..."
+            required
+            class="url-input"
+            :disabled="loading"
+          />
+          <button 
+            type="button" 
+            @click="pasteUrl"
+            class="paste-button"
+            title="Coller depuis le presse-papier"
           >
-            <span v-if="loading" class="spinner inline-block w-5 h-5 border-2 border-white/20 border-t-white rounded-full"></span>
-            <span>{{ loading ? 'Lancement de l’analyse...' : '🚀 Analyser et Générer les Shorts' }}</span>
+            📋 Coller
           </button>
-        </form>
-      </div>
+        </div>
+
+        <!-- Grille d'options -->
+        <div class="options-grid">
+          <!-- Mode de cadrage -->
+          <div class="option-box">
+            <span class="option-label">Format & Cadrage Vertical</span>
+            <div class="segmented-control">
+              <button
+                type="button"
+                @click="cropMode = 'crop'"
+                :class="{ active: cropMode === 'crop' }"
+                class="segmented-btn"
+              >
+                🎯 Plein écran (Face-Track)
+              </button>
+              <button
+                type="button"
+                @click="cropMode = 'blur'"
+                :class="{ active: cropMode === 'blur' }"
+                class="segmented-btn"
+              >
+                🌫️ Fond Flouté
+              </button>
+            </div>
+          </div>
+
+          <!-- Automatisation -->
+          <div class="option-box">
+            <label class="toggle-wrapper">
+              <input 
+                type="checkbox" 
+                v-model="autoRender" 
+                class="toggle-checkbox"
+              />
+              <div>
+                <div class="toggle-text-main">Génération automatique</div>
+                <div class="toggle-text-sub">Rendu immédiat des 3 meilleurs clips détectés</div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Bouton Soumettre -->
+        <button
+          type="submit"
+          :disabled="loading || !videoUrl"
+          class="submit-btn"
+        >
+          <span v-if="loading" class="spinner spinner-sm"></span>
+          <span>{{ loading ? 'Lancement de l’analyse...' : '🚀 Détecter & Générer les Shorts' }}</span>
+        </button>
+      </form>
     </section>
 
-    <!-- SUIVI DU JOB EN COURS -->
-    <section v-if="activeJob && activeJob.status !== 'completed'" class="glass-panel p-6 mb-8 border-purple-500/40 bg-purple-950/20">
-      <div class="flex items-center justify-between gap-4">
-        <div class="flex items-center gap-4">
-          <div class="w-10 h-10 rounded-full bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-purple-300">
-            <span class="spinner inline-block w-5 h-5 border-2 border-purple-400/20 border-t-purple-400 rounded-full"></span>
+    <!-- SUIVI DU TRAITEMENT EN COURS -->
+    <section v-if="activeJob && activeJob.status !== 'completed'" class="glass-panel job-panel">
+      <div class="job-header">
+        <div class="job-left">
+          <div class="job-spinner-box">
+            <span class="spinner spinner-md"></span>
           </div>
           <div>
-            <div class="text-xs uppercase font-bold tracking-wider text-purple-400">Traitement en arrière-plan</div>
-            <div class="text-base font-semibold text-white">{{ activeJob.step || 'Initialisation...' }}</div>
-            <div v-if="activeJob.metadata" class="text-xs text-slate-400 mt-0.5">
-              {{ activeJob.metadata.title }} ({{ Math.floor(activeJob.metadata.duration / 60) }}m)
+            <div class="job-badge-tag">Traitement IA en cours</div>
+            <div class="job-step-title">{{ activeJob.step || 'Initialisation du pipeline...' }}</div>
+            <div v-if="activeJob.metadata" class="job-meta-desc">
+              {{ activeJob.metadata.title }} ({{ Math.floor(activeJob.metadata.duration / 60) }} min)
             </div>
           </div>
         </div>
-        <div class="text-xs px-3 py-1 rounded-full bg-purple-500/20 text-purple-300 font-mono">
+        <div class="job-status-pill">
           {{ activeJob.status }}
         </div>
       </div>
-      <div v-if="activeJob.error" class="mt-4 p-4 rounded-xl bg-red-500/15 border border-red-500/30 text-red-200 text-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div class="flex items-center gap-2.5">
-          <span class="text-lg">⚠️</span>
+
+      <!-- Erreur éventuelle -->
+      <div v-if="activeJob.error" class="job-error-box">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 1.1rem;">⚠️</span>
           <span>{{ activeJob.error }}</span>
         </div>
         <button 
-          v-if="!hasCookies || activeJob.error.includes('cookies') || activeJob.error.includes('bot')"
+          v-if="!hasCookies || activeJob.error.includes('cookies') || activeJob.error.includes('bot') || activeJob.error.includes('reloaded')"
           @click="openCookiesModal"
-          class="btn btn-primary text-xs px-3 py-1.5 whitespace-nowrap shadow-lg shrink-0"
+          class="btn btn-primary btn-sm"
+          style="white-space: nowrap;"
         >
           🍪 Configurer les cookies
         </button>
@@ -162,117 +167,120 @@
 
     <!-- GALERIE DES SHORTS GÉNÉRÉS -->
     <section>
-      <div class="flex items-center justify-between mb-6">
+      <div class="gallery-header">
         <div>
-          <h2 class="text-xl font-bold text-white flex items-center gap-2">
+          <h2 class="gallery-title">
             📥 Shorts Prêts au Téléchargement
-            <span class="text-xs px-2.5 py-0.5 rounded-full bg-white/10 text-slate-300 font-mono">{{ shorts.length }}</span>
+            <span class="count-bubble">{{ shorts.length }}</span>
           </h2>
-          <p class="text-xs text-slate-400">Les vidéos peuvent être téléchargées puis supprimées en un clic pour libérer l'espace disque du VPS.</p>
+          <p class="gallery-sub">Visualisez vos clips 9:16 puis téléchargez-les avec purge automatique du VPS.</p>
         </div>
-        <button @click="fetchShorts" class="btn btn-secondary text-xs px-3 py-1.5 flex items-center gap-1.5">
+        <button @click="fetchShorts" class="btn btn-secondary btn-sm">
           🔄 Actualiser
         </button>
       </div>
 
       <!-- Aucun short -->
-      <div v-if="shorts.length === 0" class="glass-panel p-12 text-center text-slate-400">
-        <div class="text-4xl mb-3">🎬</div>
-        <h3 class="text-base font-semibold text-white mb-1">Aucun Short pour le moment</h3>
-        <p class="text-xs text-slate-500 max-w-sm mx-auto">Colle une URL YouTube ci-dessus pour lancer la détection des meilleurs moments viraux.</p>
+      <div v-if="shorts.length === 0" class="glass-panel empty-gallery">
+        <div class="empty-icon">🎬</div>
+        <h3 class="empty-title">Aucun Short généré pour le moment</h3>
+        <p class="empty-desc">Colle une URL YouTube ci-dessus pour lancer la détection intelligente des moments viraux.</p>
       </div>
 
-      <!-- Grille des shorts -->
-      <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <!-- Grille responsive des Shorts -->
+      <div v-else class="shorts-grid">
         <article 
           v-for="short in shorts" 
           :key="short.id"
-          class="glass-panel overflow-hidden flex flex-col transition hover:border-purple-500/30"
+          class="short-card"
         >
-          <!-- Lecteur Vidéo Vertical 9:16 -->
-          <div class="relative bg-black aspect-[9/16] w-full max-h-[460px] flex items-center justify-center overflow-hidden">
+          <!-- Conteneur Smartphone 9:16 STRICT -->
+          <div class="video-frame-container">
             <video 
               :src="`/api/shorts/${short.id}/video`"
               controls
               playsinline
               preload="metadata"
-              class="w-full h-full object-contain"
+              class="short-video-player"
             ></video>
-            <!-- Badge score viral -->
-            <div class="absolute top-3 right-3 badge badge-purple shadow-lg">
+
+            <!-- Badge Score Viral -->
+            <div class="virality-badge">
               🔥 {{ short.clip.virality_score }}/10
             </div>
-            <!-- Badge durée -->
-            <div class="absolute bottom-3 left-3 px-2 py-0.5 rounded bg-black/70 backdrop-blur-md text-white text-[11px] font-mono">
-              {{ Math.round(short.clip.end_time - short.clip.start_time) }}s • {{ short.crop_mode.toUpperCase() }}
+
+            <!-- Badge Durée & Format -->
+            <div class="duration-badge">
+              {{ Math.round(short.clip.end_time - short.clip.start_time) }}s • {{ short.crop_mode === 'crop' ? 'PLEIN ÉCRAN' : 'FLOU' }}
             </div>
           </div>
 
-          <!-- Contenu & Métadonnées -->
-          <div class="p-5 flex-1 flex flex-col justify-between space-y-4">
-            <div>
-              <!-- Titre du Short -->
-              <div class="flex items-start justify-between gap-2 mb-2">
-                <h3 class="font-bold text-white text-base leading-snug">
+          <!-- Métadonnées & Accroche -->
+          <div class="card-content">
+            <div class="card-top">
+              <!-- Titre -->
+              <div class="card-title-row">
+                <h3 class="card-title" :title="short.clip.title">
                   {{ short.clip.title }}
                 </h3>
                 <button 
                   @click="copyText(short.clip.title, 'Titre copié !')"
-                  class="text-xs p-1 text-slate-400 hover:text-purple-300 transition"
+                  class="copy-icon-btn"
                   title="Copier le titre"
                 >
                   📋
                 </button>
               </div>
 
-              <!-- Accroche / Hook -->
-              <p class="text-xs text-slate-400 line-clamp-2 mb-3 italic">
+              <!-- Hook / Accroche IA -->
+              <p class="card-hook" :title="short.clip.hook_summary">
                 « {{ short.clip.hook_summary }} »
               </p>
 
-              <!-- Tags -->
-              <div class="flex flex-wrap gap-1.5 mb-3">
+              <!-- Hashtags -->
+              <div class="hashtags-cluster" v-if="short.clip.hashtags && short.clip.hashtags.length">
                 <span 
                   v-for="tag in short.clip.hashtags" 
                   :key="tag"
-                  class="text-[11px] px-2 py-0.5 rounded bg-white/5 text-purple-300 border border-white/5"
+                  class="tag-pill"
                 >
                   {{ tag }}
                 </span>
               </div>
             </div>
 
-            <!-- Actions de téléchargement et suppression -->
-            <div class="pt-4 border-t border-white/10 space-y-2">
-              <!-- Télécharger & Supprimer (Recommandé pour VPS) -->
+            <!-- Actions Téléchargement & Purge -->
+            <div class="card-actions-area">
+              <!-- Télécharger & Purger (Recommandé) -->
               <button
                 @click="downloadShort(short.id, true)"
-                class="btn btn-success w-full text-xs font-bold py-2.5"
-                title="Télécharge la vidéo et libère immédiatement l'espace disque sur le VPS"
+                class="btn-purge-download"
+                title="Télécharge la vidéo sur votre appareil et libère immédiatement le disque du VPS"
               >
                 ⚡ Télécharger & Purger du VPS
               </button>
 
-              <div class="flex gap-2">
+              <div class="actions-sub-row">
                 <!-- Télécharger uniquement -->
                 <button
                   @click="downloadShort(short.id, false)"
-                  class="btn btn-secondary flex-1 text-xs py-2"
+                  class="btn-save-vps"
+                  title="Télécharger sans supprimer du serveur"
                 >
                   💾 Garder sur VPS
                 </button>
                 <!-- Supprimer manuellement -->
                 <button
                   @click="deleteShort(short.id)"
-                  class="btn btn-danger text-xs px-3 py-2"
-                  title="Supprimer définitivement"
+                  class="btn-delete-short"
+                  title="Supprimer définitivement du VPS"
                 >
                   🗑️
                 </button>
               </div>
 
-              <div class="text-[11px] text-slate-500 text-center pt-1">
-                Taille : {{ short.file_size_mb }} Mo
+              <div class="file-size-info">
+                Taille fichier : {{ short.file_size_mb }} Mo
               </div>
             </div>
           </div>
@@ -281,107 +289,108 @@
     </section>
 
     <!-- TOAST NOTIFICATION -->
-    <div 
-      v-if="toastMessage" 
-      class="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl bg-purple-900/90 text-white border border-purple-500/40 shadow-2xl backdrop-blur-md text-sm font-semibold flex items-center gap-2 animate-bounce"
-    >
-      <span>✓</span> {{ toastMessage }}
+    <div v-if="toastMessage" class="toast-container">
+      <span style="color: #6ee7b7; font-size: 1.1rem;">✓</span>
+      <span>{{ toastMessage }}</span>
     </div>
+
     <!-- MODAL CONFIGURATION COOKIES YOUTUBE -->
-    <div v-if="showCookiesModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
-      <div class="glass-panel max-w-xl w-full p-6 relative border-purple-500/40 shadow-2xl">
+    <div v-if="showCookiesModal" class="modal-backdrop" @click.self="showCookiesModal = false">
+      <div class="modal-dialog">
         <button 
           @click="showCookiesModal = false"
-          class="absolute top-4 right-4 text-slate-400 hover:text-white text-base w-8 h-8 rounded-full flex items-center justify-center bg-white/5 hover:bg-white/10 transition"
+          class="modal-close-btn"
+          title="Fermer"
         >
           ✕
         </button>
 
-        <div class="flex items-center gap-3 mb-4">
-          <div class="w-10 h-10 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center text-xl">
+        <div class="modal-header">
+          <div class="modal-icon-box">
             🍪
           </div>
           <div>
-            <h3 class="text-lg font-bold text-white">Cookies YouTube (Anti-Bot VPS)</h3>
-            <p class="text-xs text-slate-400">Permet à yt-dlp de télécharger sans blocage depuis les adresses IP du VPS</p>
+            <h3 class="modal-title">Cookies YouTube (Anti-Bot VPS)</h3>
+            <p class="modal-desc">Authentification sécurisée requise par YouTube pour autoriser le téléchargement</p>
           </div>
         </div>
 
-        <!-- Explication guidée -->
-        <div class="p-4 rounded-xl bg-purple-950/25 border border-purple-500/30 text-xs text-slate-300 space-y-2.5 mb-4">
-          <div class="font-bold text-purple-300 flex items-center gap-1.5 text-sm">
-            <span>✨</span> Méthode recommandée (résout 'The page needs to be reloaded') :
+        <!-- Guide pas à pas -->
+        <div class="guide-card">
+          <div class="guide-card-title">
+            <span>✨</span> Méthode infaillible (Anti-erreur 'The page needs to be reloaded') :
           </div>
-          <ol class="list-decimal list-inside space-y-2 text-slate-300">
-            <li>Ouvrez <a href="https://youtube.com" target="_blank" rel="noopener" class="text-purple-400 underline font-semibold">youtube.com</a> et assurez-vous d'être connecté à votre compte.</li>
+          <ol class="guide-steps">
+            <li>Ouvrez <a href="https://youtube.com" target="_blank" rel="noopener">youtube.com</a> connecté à votre compte.</li>
             <li>
-              <strong class="text-white">Astuce clé :</strong> Dans ce même onglet, ouvrez l'adresse 
-              <a href="https://www.youtube.com/robots.txt" target="_blank" rel="noopener" class="text-cyan-400 font-mono underline bg-white/5 px-1.5 py-0.5 rounded">https://www.youtube.com/robots.txt</a>
-              <div class="text-[11px] text-slate-400 pl-4 mt-0.5">↳ Cela empêche YouTube de modifier ou désynchroniser vos jetons de session au moment de l'export.</div>
+              <strong>Étape clé :</strong> Dans ce même onglet, naviguez vers :
+              <br/>
+              <a href="https://www.youtube.com/robots.txt" target="_blank" rel="noopener">https://www.youtube.com/robots.txt</a>
+              <div class="guide-tip">↳ Empêche YouTube de réinitialiser le jeton de session pendant l'export.</div>
             </li>
-            <li>Cliquez sur l'extension <span class="text-purple-300 font-semibold">Get cookies.txt LOCALLY</span> -> cliquez sur <strong>Export</strong>.</li>
-            <li>Déposez le fichier <code class="text-purple-300">cookies.txt</code> ci-dessous et cliquez sur <strong>Enregistrer</strong>.</li>
+            <li>Cliquez sur l'extension <strong>Get cookies.txt LOCALLY</strong> puis sur <strong>Export</strong>.</li>
+            <li>Déposez le fichier <code>cookies.txt</code> ci-dessous et validez.</li>
           </ol>
         </div>
 
-        <!-- Résultat du test de session -->
-        <div v-if="testResult" class="p-3.5 rounded-xl text-xs mb-4 border" :class="testResult.success ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-200' : 'bg-amber-500/15 border-amber-500/30 text-amber-200'">
-          <div class="flex items-start gap-2 font-semibold">
-            <span class="text-sm">{{ testResult.success ? '✓' : '⚠️' }}</span>
+        <!-- Résultat test session -->
+        <div v-if="testResult" class="test-alert" :class="testResult.success ? 'success' : 'error'">
+          <div style="font-weight: 700; display: flex; align-items: center; gap: 6px;">
+            <span>{{ testResult.success ? '✓' : '⚠️' }}</span>
             <span>{{ testResult.success ? testResult.message : testResult.error }}</span>
           </div>
-          <div v-if="testResult.hint" class="text-slate-300 mt-1 pl-5 text-[11px] leading-relaxed">
+          <div v-if="testResult.hint" style="margin-top: 4px; font-size: 0.75rem; opacity: 0.9;">
             💡 {{ testResult.hint }}
           </div>
         </div>
 
-        <!-- Zone de dépôt de fichier -->
+        <!-- Dropzone -->
         <div 
           @dragover.prevent="dragOver = true"
           @dragleave.prevent="dragOver = false"
           @drop.prevent="handleFileDrop"
-          class="border-2 border-dashed rounded-xl p-5 text-center transition cursor-pointer mb-4"
-          :class="dragOver ? 'border-purple-500 bg-purple-500/10' : 'border-white/10 hover:border-white/20 bg-white/[0.02]'"
+          class="dropzone"
+          :class="{ active: dragOver }"
           @click="triggerFileInput"
         >
-          <input type="file" ref="fileInput" @change="handleFileSelect" accept=".txt" class="hidden" />
-          <div class="text-2xl mb-1">📄</div>
-          <div class="text-sm font-semibold text-white">Glissez votre fichier cookies.txt ici</div>
-          <div class="text-xs text-slate-400 mt-1">ou cliquez pour parcourir vos dossiers</div>
+          <input type="file" ref="fileInput" @change="handleFileSelect" accept=".txt" style="display: none;" />
+          <div class="dropzone-icon">📄</div>
+          <div class="dropzone-label">Glissez votre fichier cookies.txt ici</div>
+          <div class="dropzone-sub">ou cliquez pour sélectionner le fichier depuis votre ordinateur</div>
         </div>
 
-        <!-- Zone de collage manuel -->
-        <div class="mb-4">
-          <label class="block text-xs font-semibold text-slate-400 mb-1">Ou collez le contenu texte brut :</label>
+        <!-- Textarea secours -->
+        <div class="textarea-group">
+          <label class="textarea-label">Ou collez le contenu texte brut :</label>
           <textarea 
             v-model="cookiesInputText" 
-            rows="4" 
+            rows="3" 
             placeholder="# Netscape HTTP Cookie File&#10;.youtube.com TRUE / FALSE 1750000000 VISITOR_INFO1_LIVE ..."
-            class="input-field text-xs font-mono resize-none w-full"
+            class="cookies-textarea"
           ></textarea>
         </div>
 
-        <!-- Actions & Statut -->
-        <div class="flex items-center justify-between gap-3 pt-3 border-t border-white/10">
-          <div class="text-xs">
-            <span v-if="cookiesStatus.configured" class="text-emerald-400 font-medium">✓ Actifs sur le serveur ({{ Math.round(cookiesStatus.file_size_bytes / 1024) }} Ko)</span>
-            <span v-else class="text-amber-400 font-medium">⚠️ Aucun cookie configuré</span>
+        <!-- Footer Actions -->
+        <div class="modal-footer">
+          <div class="modal-footer-status">
+            <span v-if="cookiesStatus.configured" style="color: #6ee7b7;">✓ Actifs sur le serveur ({{ Math.round(cookiesStatus.file_size_bytes / 1024) }} Ko)</span>
+            <span v-else style="color: #fcd34d;">⚠️ Aucun cookie configuré</span>
           </div>
-          <div class="flex flex-wrap gap-2">
+          <div class="modal-footer-actions">
             <button 
               @click="testCurrentCookies"
               :disabled="testingCookies"
               type="button" 
-              class="btn btn-secondary text-xs px-3 py-1.5 flex items-center gap-1.5"
+              class="btn btn-secondary btn-sm"
             >
-              <span v-if="testingCookies" class="spinner inline-block w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full"></span>
+              <span v-if="testingCookies" class="spinner spinner-sm"></span>
               <span>{{ testingCookies ? 'Test en cours...' : '🧪 Tester la connexion' }}</span>
             </button>
             <button 
               v-if="cookiesStatus.configured" 
               @click="removeCookies" 
               type="button" 
-              class="btn btn-danger text-xs px-3 py-1.5"
+              class="btn btn-danger btn-sm"
             >
               Supprimer
             </button>
@@ -389,7 +398,7 @@
               @click="saveCookies" 
               :disabled="savingCookies || !cookiesInputText.trim()" 
               type="button" 
-              class="btn btn-primary text-xs px-4 py-1.5 font-bold"
+              class="btn btn-primary btn-sm"
             >
               {{ savingCookies ? 'Enregistrement...' : 'Enregistrer les cookies' }}
             </button>
@@ -427,7 +436,7 @@ const showToast = (msg) => {
   toastMessage.value = msg
   setTimeout(() => {
     toastMessage.value = ''
-  }, 3000)
+  }, 3200)
 }
 
 const copyText = (text, successMsg) => {
@@ -517,13 +526,12 @@ const saveCookies = async () => {
       showToast('Cookies YouTube enregistrés avec succès !')
       cookiesInputText.value = ''
       await fetchCookiesStatus()
-      // Tester immédiatement les cookies nouvellement enregistrés
       await testCurrentCookies()
     } else {
       const data = await res.json()
       showToast('Erreur : ' + (data.detail || 'Impossible d enregistrer'))
     }
-  } catch (err) {
+  } catch {
     showToast('Erreur réseau lors de l enregistrement')
   } finally {
     savingCookies.value = false
@@ -691,7 +699,3 @@ onUnmounted(() => {
   if (pollInterval) clearInterval(pollInterval)
 })
 </script>
-
-<style scoped>
-/* Scoped adjustments */
-</style>
