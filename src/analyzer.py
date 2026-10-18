@@ -31,7 +31,7 @@ Règles impératives de détection :
 def analyze_video_for_viral_clips(
     metadata: VideoMetadata,
     segments: List[TranscriptSegment],
-    model_name: str = "gemini-2.5-flash",
+    model_name: str = "gemini-3.8-flash",
     max_clips: int = 3
 ) -> ViralAnalysisResult:
     """

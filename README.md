@@ -8,7 +8,7 @@ Système complet d'analyse, d'extraction et de génération de **YouTube Shorts 
 
 ## 📌 1. Fonctionnalités Principales
 
-* 🧠 **Détection IA des moments viraux (Google Gemini 2.0 / 1.5 Flash)** :
+* 🧠 **Détection IA des moments viraux (Google Gemini 3.8 / 1.5 Flash)** :
   * Analyse de la transcription complète de la vidéo (jusqu'à plusieurs heures).
   * Identification d'accroches percutantes (*hooks*), storytelling et scoring de viralité (0-100).
   * Rédaction automatique de titres accrocheurs, captions et hashtags optimisés.
@@ -61,7 +61,7 @@ Le système est conçu pour tourner sur un **VPS OVH d'entrée de gamme** (2 vCo
 | **Extraction & Découpage** | **yt-dlp[default] + yt-dlp-ejs** | Récupération des flux vidéo/audio et des sous-titres YouTube. |
 | **Challenge Solver** | **Deno** | Runtime JS moderne et sécurisé pour déchiffrer les tokens YouTube. |
 | **Transcription** | **Groq API (Whisper-large-v3)** | Transcription automatique mot à mot en quelques secondes. |
-| **IA & Viralité** | **Google Gemini 2.0 Flash** | Détection d'extraits viraux, scoring et génération de métadonnées. |
+| **IA & Viralité** | **Google Gemini 3.8 Flash** | Détection d'extraits viraux, scoring et génération de métadonnées. |
 | **Face Tracking** | **MediaPipe Face Detection** | Suivi du visage de l'orateur pour recadrer dynamiquement en 9:16. |
 | **Encodage & Rendu** | **FFmpeg statique** | Recadrage, floutage et incrustation des sous-titres ASS. |
 
@@ -76,7 +76,7 @@ flowchart TD
     C -- Oui --> D[Téléchargement & Parsing JSON3 / VTT]
     C -- Non --> E[Extraction audio mono 48k & Découpage en blocs]
     E --> F[Transcription via Groq Whisper-large-v3]
-    D --> G[Analyse des moments viraux par Gemini Flash]
+    D --> G[Analyse des moments viraux par Gemini Flash 3.8]
     F --> G
     G --> H[Sélection des clips : Timestamps, Hook, Titre, Score]
     H --> I[Téléchargement ciblé du segment 30-60s via yt-dlp + Deno]
