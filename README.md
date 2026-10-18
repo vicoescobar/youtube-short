@@ -1,49 +1,69 @@
 # 🎬 YouTube Shorts Viral Clipper
 
-Système semi-automatisé d'analyse, d'extraction et de génération de **YouTube Shorts viraux** à partir de vidéos longues (podcasts, rediffusions de streams, divertissement), optimisé pour tourner sur une infrastructure légère et peu coûteuse.
+Système complet d'analyse, d'extraction et de génération de **YouTube Shorts viraux 9:16** à partir de vidéos longues (podcasts, rediffusions de streams, divertissement), optimisé pour tourner sur une infrastructure légère et peu coûteuse (VPS OVH / CloudPanel) sans Docker.
+
+🔗 **Production en ligne :** [ytshorts.victor-giroud.fr](https://ytshorts.victor-giroud.fr)
 
 ---
 
-## 📌 1. Contexte & Objectifs
+## 📌 1. Fonctionnalités Principales
 
-* **Le concept :** Détecter les moments forts et viraux (30 à 60 secondes) dans les vidéos longues de chaînes cibles, les recadrer au format vertical (9:16), incrusté de sous-titres animés et de métadonnées percutantes (titres, tags, descriptions).
-* **Le modèle de diffusion (Semi-automatisé) :** 
-  * Plutôt qu'un upload direct et risqué via l'API YouTube, le pipeline prépare les clips et les met à disposition sur un **Dashboard web** et/ou les envoie via un **Bot Telegram / Webhook Discord**.
-  * **Pourquoi ce choix ?**
-    1. **Contournement des quotas YouTube API** : L'API limite à 6 uploads/jour (1 600 unités par upload sur un quota de 10 000/jour).
-    2. **Éviter le statut "Privé" forcé** : Les applications tierces non auditées par Google voient leurs uploads bridés en statut privé.
-    3. **Sécurité & Contrôle qualité** : Validation humaine pour éviter les strikes de droit d'auteur (Content ID) et la sanction pour *"Contenu réutilisé sans valeur ajoutée"*.
-* **Monétisation visée :** Au-delà du faible RPM des Shorts Adsense (~0,01 $ à 0,07 $ pour 1 000 vues), le modèle vise le trafic, l'affiliation, les partenariats/sponsors et la croissance d'audience.
-
----
-
-## ⚙️ 2. Contraintes d'Infrastructure & Optimisations
-
-Le projet est calibré pour tourner sur un **VPS OVH d'entrée de gamme** :
-* **Ressources :** 2 vCores, 4 Go de RAM, 40 Go de stockage NVMe/SSD.
-* **Budget outils tiers :** Moins de 5 € / mois (largement sous le budget max de 20 €).
-
-### Stratégies d'optimisation indispensables :
-1. **Zéro saturation disque (40 Go)** : L'analyse se fait uniquement sur la piste audio compressée. La vidéo brute n'est jamais téléchargée en entier : seul l'extrait ciblé (30-60s) est téléchargé et traité avant suppression immédiate des rushs temporaires.
-2. **Économie de RAM & CPU** :
-   * Pas de JVM Java lourde (Spring) ni de multiplicité de conteneurs Docker indépendants.
-   * Déportation de la transcription lourde (Whisper) et de l'analyse IA vers des API cloud ultra-rapides et très peu coûteuses.
-   * File d'attente séquentielle (FIFO) : une seule conversion vidéo FFmpeg à la fois pour ne jamais écraser les 2 vCores.
-3. **Surveillance des chaînes sans quota** : Utilisation des flux RSS natifs de YouTube (`https://www.youtube.com/feeds/videos.xml?channel_id=...`) plutôt que l'API officielle.
+* 🧠 **Détection IA des moments viraux (Google Gemini 2.0 / 1.5 Flash)** :
+  * Analyse de la transcription complète de la vidéo (jusqu'à plusieurs heures).
+  * Identification d'accroches percutantes (*hooks*), storytelling et scoring de viralité (0-100).
+  * Rédaction automatique de titres accrocheurs, captions et hashtags optimisés.
+* ⚡ **Transcription ultra-rapide (Subtitles natifs ou Groq Whisper-large-v3)** :
+  * Extraction instantanée des sous-titres YouTube officiels ou automatiques sans réencodage.
+  * Repli automatique sur Whisper via l'API Groq (mono 48k en morceaux légers) si aucun sous-titre n'existe.
+* 🎥 **Cadrage intelligent vertical 9:16 (1080x1920)** :
+  * **Mode Recadrage intelligent (*Crop*)** : Face-tracking dynamique par vision par ordinateur (**MediaPipe**) pour centrer en continu la caméra sur l'orateur, même s'il se déplace.
+  * **Mode Fond flouté (*Blur*)** : Vidéo 16:9 au centre avec arrière-plan 9:16 flouté et agrandi.
+* ✍️ **Sous-titres animés percutants (Format ASS)** :
+  * Typographie moderne avec surlignage dynamique mot à mot (style TikTok / Shorts / Reels).
+* 🛡️ **Bypass Anti-Bot YouTube & Gestion de session** :
+  * Résolution des *n-challenges* JavaScript YouTube via le moteur **Deno** et les solveurs `yt-dlp-ejs`.
+  * Gestionnaire de cookies YouTube intégré au Dashboard avec bouton de test de connexion direct.
+  * Profils de lecteurs adaptés pour éliminer les erreurs de rechargement (`The page needs to be reloaded`).
+* 🖥️ **Dashboard Web moderne (Vue 3 + Vite)** :
+  * Interface épurée avec glassmorphism et animations soignées.
+  * Suivi des étapes d'analyse en temps réel, aperçu 9:16 des vidéos générées, et téléchargement en un clic.
 
 ---
 
-## 🛠️ 3. Stack Technique Retenue
+## ⚙️ 2. Architecture & Optimisations VPS (Sans Docker)
+
+Le système est conçu pour tourner sur un **VPS OVH d'entrée de gamme** (2 vCores, 4 Go RAM, 40 Go SSD) :
+
+1. **Zéro saturation disque** :
+   * La vidéo brute d'origine n'est jamais téléchargée en entier.
+   * Seul l'extrait précis (30 à 60 secondes) est téléchargé par `yt-dlp`.
+   * Les rushs et fichiers temporaires sont purgés immédiatement après encodage.
+2. **Déploiement Natif Ultra-léger** :
+   * Pas de surcharge mémoire due à des conteneurs Docker ou des machines virtuelles Java.
+   * Dépendances Python isolées via `uv` (exécutables Python 3.14).
+   * Runtimes externes provisionnés de manière autonome dans l'espace utilisateur sans droits root :
+     * **Deno** (`~/.deno/bin/deno`) pour exécuter les scripts de signature YouTube.
+     * **FFmpeg & ffprobe** (`~/.local/bin/ffmpeg`) statiques pour le découpage et le rendu vidéo.
+3. **Budget mensuel ultra-faible** :
+   * Transcription Groq : Palier gratuit ou fractions de centimes.
+   * Analyse Gemini Flash : Moins de 1 à 2 € / mois.
+   * Coût total additionnel : **< 2 € / mois**.
+
+---
+
+## 🛠️ 3. Stack Technique
 
 | Composant | Technologie | Rôle & Justification |
 | :--- | :--- | :--- |
-| **Backend & Worker** | **Python (FastAPI)** | Écosystème roi pour la manipulation multimédia (`yt-dlp`, FFmpeg, API Google GenAI). Faible empreinte mémoire (~70 Mo de RAM). |
-| **Frontend Dashboard** | **Vue 3 (Vite + TailwindCSS)** | Dashboard léger, moderne et réactif pour piloter les chaînes suivies, lancer des vidéos manuelles et télécharger les clips. |
-| **Base de Données & Queue** | **SQLite / Peewee ou SQLAlchemy** | Simple, sans serveur, ultra-léger et largement suffisant pour orchestrer l'état des jobs et l'historique des shorts. |
-| **Transcription** | **Groq API (Whisper-Large-v3)** | Transcription intégrale en ~5 secondes pour quelques fractions de centimes, avec timestamps précis mot à mot. |
-| **Cerveau & Analyse Virale** | **Google Gemini 2.0 / 1.5 Flash** | Fenêtre de contexte de 1M+ tokens, traitement multimodal audio/texte, détection d'accroches (hooks), scoring de viralité et rédaction de titres/descriptions. |
-| **Rendu Vidéo** | **FFmpeg** | Découpage à la frame près, recadrage 9:16 (effet split-screen ou arrière-plan flouté), génération des sous-titres animés au format ASS. |
-| **Notifications** | **Bot Telegram / Webhook Discord** | Envoi instantané d'une notification avec le clip vidéo ou le lien de téléchargement direct. |
+| **Backend** | **FastAPI (Python 3.14)** | Traitement asynchrone des requêtes, orchestration des jobs et streaming vidéo. |
+| **Gestionnaire de paquets** | **Astral uv** | Résolution et synchronisation ultra-rapides des dépendances Python. |
+| **Frontend** | **Vue 3 (Vite + CSS)** | Tableau de bord dynamique, modal de gestion des cookies, lecteur vidéo 9:16. |
+| **Extraction & Découpage** | **yt-dlp[default] + yt-dlp-ejs** | Récupération des flux vidéo/audio et des sous-titres YouTube. |
+| **Challenge Solver** | **Deno** | Runtime JS moderne et sécurisé pour déchiffrer les tokens YouTube. |
+| **Transcription** | **Groq API (Whisper-large-v3)** | Transcription automatique mot à mot en quelques secondes. |
+| **IA & Viralité** | **Google Gemini 2.0 Flash** | Détection d'extraits viraux, scoring et génération de métadonnées. |
+| **Face Tracking** | **MediaPipe Face Detection** | Suivi du visage de l'orateur pour recadrer dynamiquement en 9:16. |
+| **Encodage & Rendu** | **FFmpeg statique** | Recadrage, floutage et incrustation des sous-titres ASS. |
 
 ---
 
@@ -51,100 +71,112 @@ Le projet est calibré pour tourner sur un **VPS OVH d'entrée de gamme** :
 
 ```mermaid
 flowchart TD
-    A[Cron Job / Watcher] -->|Lecture flux RSS YouTube| B{Nouvelle vidéo ?}
-    Z[Dashboard Web : URL manuelle] --> C
-    B -- Oui --> C[Téléchargement Audio uniquement via yt-dlp]
-    C --> D[Transcription ultra-rapide : Groq Whisper-large-v3]
-    D --> E[Analyse par Gemini 2.0 Flash]
-    E -->|Génération métadonnées| F[Timestamps du clip + Titre + Caption + Score]
-    F --> G[File d'attente Worker séquentiel]
-    G --> H[Téléchargement ciblé du segment 30-60s via yt-dlp]
-    H --> I[Rendu FFmpeg : Recadrage 9:16 + Sous-titres dynamiques ASS]
-    I --> J[Purge des fichiers sources temporaires]
-    J --> K[Enregistrement en BDD + Disponibilité sur le Dashboard]
-    K --> L[Notification Telegram avec le clip final]
+    A[Dashboard Web : Saisie URL YouTube] --> B[Sanitisation de l'URL & Extraction métadonnées]
+    B --> C{Sous-titres natifs disponibles ?}
+    C -- Oui --> D[Téléchargement & Parsing JSON3 / VTT]
+    C -- Non --> E[Extraction audio mono 48k & Découpage en blocs]
+    E --> F[Transcription via Groq Whisper-large-v3]
+    D --> G[Analyse des moments viraux par Gemini Flash]
+    F --> G
+    G --> H[Sélection des clips : Timestamps, Hook, Titre, Score]
+    H --> I[Téléchargement ciblé du segment 30-60s via yt-dlp + Deno]
+    I --> J[Détection faciale MediaPipe & Génération sous-titres ASS]
+    J --> K[Encodage FFmpeg 9:16 : Mode Crop ou Blur]
+    K --> L[Purge immédiate des fichiers temporaires]
+    L --> M[Disponibilité instantanée sur le Dashboard Web]
 ```
 
 ---
 
-## 📊 5. Estimation des Coûts Mensuels
+## 🚀 5. Installation & Lancement en Local
 
-| Service | Coût estimé |
-| :--- | :--- |
-| **VPS OVH (2 vCores, 4 Go RAM)** | Existant (~5-10 €/mois) |
-| **Groq API (Whisper)** | Gratuit (Tier gratuit généreux) ou ~0.10 $ pour 50 vidéos |
-| **Gemini 2.0 Flash (Google AI Studio)** | < 1 à 2 $ / mois pour des centaines d'heures de transcriptions analysées |
-| **Bot Telegram / RSS** | 100 % Gratuit |
-| **Total additionnel** | **< 3 € / mois** |
+### Prérequis
+* Python >= 3.12 (recommandé : Python 3.14 via `uv`)
+* Node.js >= 18 (pour compiler le frontend)
+* FFmpeg installé sur votre machine
+* [Astral uv](https://astral.sh/uv) (`curl -LsSf https://astral.sh/uv/install.sh | sh`)
 
-## 💻 Utilisation du CLI (Phase 1)
+### Configuration
 
-Pour tester l'extraction, la détection des clips viraux et le rendu vidéo 9:16 :
-
-1. Renseigne ta clé API Gemini dans le fichier `.env` :
+1. Cloner le dépôt :
    ```bash
-   GEMINI_API_KEY=AIzaSy...
+   git clone git@github.com:vicoescobar/youtube-short.git
+   cd youtube-short
    ```
-2. Lance l'outil sur la vidéo YouTube de ton choix :
+
+2. Créer le fichier `.env` :
    ```bash
-   uv run python -m src.cli --url "https://www.youtube.com/watch?v=VOTRE_VIDEO"
+   cp .env.example .env
    ```
-   *Options :*
-   * `--render` : Découpe et encode directement le Short #1 en 1080x1920 avec fond flouté et sous-titres incrustés.
-   * `--clip-index 0` : Choisis l'index du clip à générer si plusieurs sont détectés.
+   Remplir vos clés :
+   ```ini
+   GEMINI_API_KEY=votre_cle_gemini
+   GROQ_API_KEY=votre_cle_groq
+   ```
 
----
+3. Installer les dépendances :
+   ```bash
+   uv sync
+   cd frontend && npm install && cd ..
+   ```
 
-## 🖥️ 6. Dashboard Web (Vue 3 + FastAPI)
+### Lancement
 
-L'application intègre un Dashboard complet pour piloter la création et gérer le stockage :
-
-* **Lancement en local (Dev)** :
+* **Démarrer le backend FastAPI** :
   ```bash
-  # Lancer l'API FastAPI
   uv run uvicorn src.api:app --reload --port 8000
-
-  # Lancer le frontend Vue 3
-  cd frontend && npm run dev
   ```
-* **Accès Dashboard** : `http://localhost:5173` (en dev) ou `http://localhost:8000` (en production / Docker).
+* **Démarrer le frontend Vue 3** :
+  ```bash
+  cd frontend
+  npm run dev
+  ```
+  Accéder à l'application sur : `http://localhost:5173`
 
 ---
 
-## 🌐 7. Déploiement VPS avec CloudPanel & GitHub Actions
+## 🛡️ 6. Gestion des Cookies YouTube (Bypass Détection Bot)
 
-### A. Configuration du site sur CloudPanel
-1. Connecte-toi à ton interface **CloudPanel**.
-2. Clique sur **+ Add Site** > **Reverse Proxy**.
-3. Remplis les champs :
-   * **Domain Name** : `shorts.tondomaine.com` (ou sous-domaine de ton choix chez IONOS).
-   * **Reverse Proxy URL** : `http://127.0.0.1:8000`
-4. Active le certificat **SSL Let's Encrypt** en 1 clic dans l'onglet *SSL/TLS*.
+Sur un serveur ou une IP datacenter, YouTube peut bloquer l'accès aux vidéos avec l'erreur `Sign in to confirm you’re not a bot`.
 
-### B. Secrets GitHub Actions
-Dans ton dépôt GitHub (`Settings` > `Secrets and variables` > `Actions` > `Repository secrets`), configure :
-* `VPS_HOST` : IP de ton VPS (ex: `51.xxx.xxx.xxx`) ou ton domaine.
-* `VPS_USER` : Utilisateur SSH (ex: `ubuntu` ou `debian`).
-* `VPS_SSH_KEY` : Ta clé privée SSH (`id_ed25519` ou `id_rsa`).
-* `VPS_PORT` : Port SSH (`22`).
-
-À chaque `git push origin main`, GitHub Actions déploie, rebuilde le conteneur Docker et nettoie les images orphelines pour économiser le SSD.
+### Comment extraire et injecter vos cookies propres :
+1. Sur votre machine locale (avec Chrome connecté à YouTube) :
+   ```bash
+   uv run yt-dlp --cookies-from-browser chrome --cookies cookies_propres.txt --skip-download "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+   ```
+2. Ouvrez le Dashboard web :
+   * Cliquez sur **Paramètres des Cookies 🍪** en haut à droite.
+   * Collez le contenu du fichier `cookies_propres.txt` (ou téléversez-le).
+   * Cliquez sur **🧪 Tester la connexion** pour valider immédiatement la session.
 
 ---
 
-## 🚀 8. Roadmap du Projet
+## 🌐 7. Déploiement Continu sur VPS (CloudPanel & GitHub Actions)
 
-- [x] **Phase 1 : Cœur de détection et de rendu (CLI / Scripts Python)**
-  - [x] Extraction automatique des sous-titres / transcription horodatée avec découpage pour vidéos longues.
-  - [x] Prompt d'ingénierie Gemini Flash (détection de hook, score de viralité, titres/tags).
-  - [x] Découpage ciblé avec `yt-dlp` et encodage FFmpeg (9:16 vertical + face-tracking MediaPipe + sous-titres ASS).
-- [x] **Phase 2 : Dashboard & API Web (FastAPI + Vue 3)**
-  - [x] API backend FastAPI avec streaming vidéo et téléchargement avec purge immédiate.
-  - [x] Dashboard Vue 3 moderne (glassmorphism, lecteur 9:16, suivi des jobs en temps réel).
-- [x] **Phase 3 : Conteneurisation & CI/CD**
-  - [x] Multi-stage Dockerfile & `docker-compose.yml` (liaison locale 127.0.0.1:8000 pour CloudPanel).
-  - [x] Workflow GitHub Actions (`.github/workflows/deploy.yml`) d'auto-déploiement sur push `main`.
-- [ ] **Phase 4 : Automatisation continue (Watcher)**
-  - [ ] Surveillance périodique des flux RSS YouTube pour auto-détection 1-2 fois par jour.
-  - [ ] Notifications Telegram directes avec lien de téléchargement.
+Le projet se déploie automatiquement sur votre VPS à chaque `git push origin main` sans Docker.
 
+### Configuration du site dans CloudPanel
+1. Créez un site de type **Reverse Proxy** (ex: `ytshorts.votredomaine.fr`).
+2. Pointez l'URL vers `http://127.0.0.1:8000`.
+3. Activez le certificat **SSL Let's Encrypt** en un clic.
+
+### Secrets GitHub Actions à renseigner
+Dans votre dépôt GitHub (`Settings` > `Secrets and variables` > `Actions`) :
+* `SSH_HOST` : Adresse IP ou nom de domaine de votre serveur.
+* `SSH_USER` : Nom de l'utilisateur SSH du site (ex: `victor-giroud-ytshorts`).
+* `SSH_TARGET_DIR` : Chemin de destination sur le serveur (ex: `/home/user/htdocs/domaine.fr`).
+* `SSH_PRIVATE_KEY` : Clé privée SSH autorisée sur le serveur.
+* `SSH_PORT` : Port SSH (`22` par défaut).
+
+Le script de déploiement CI/CD s'occupe automatiquement de :
+* Compiler le frontend Vue 3 en fichiers statiques.
+* Synchroniser le code via `rsync`.
+* Télécharger et maintenir à jour **uv**, **Deno** et **FFmpeg statique** dans `~/.local/bin`.
+* Synchroniser les dépendances Python (`uv sync --no-dev`).
+* Relancer le processus FastAPI en tâche de fond.
+
+---
+
+## 📋 8. Licence
+
+Projet sous licence MIT. Développé pour un usage personnel et semi-automatisé dans le respect des conditions d'utilisation des plateformes tierces.
