@@ -175,6 +175,16 @@ def health():
     except Exception as ex:
         ejs_ver = f"Missing: {ex}"
 
+    ffmpeg_test = {}
+    for p in ["/usr/bin/ffmpeg", "/usr/local/bin/ffmpeg", str(Path.home() / ".local/bin/ffmpeg")]:
+        if os.path.exists(p):
+            try:
+                import subprocess
+                res = subprocess.run([p, "-version"], capture_output=True, text=True, timeout=5)
+                ffmpeg_test[p] = {"code": res.returncode, "out": (res.stdout or res.stderr)[:40].strip()}
+            except Exception as e:
+                ffmpeg_test[p] = {"error": str(e)}
+
     return {
         "status": "ok",
         "has_gemini_key": bool(GEMINI_API_KEY and "your_gemini_api_key_here" not in GEMINI_API_KEY),
@@ -183,6 +193,7 @@ def health():
         "node_exec": node_exec,
         "ejs_version": ejs_ver,
         "ffmpeg": shutil.which("ffmpeg"),
+        "ffmpeg_test": ffmpeg_test,
         "output_dir": str(OUTPUT_DIR),
         "total_shorts": len(list(OUTPUT_DIR.glob("*.json")))
     }
