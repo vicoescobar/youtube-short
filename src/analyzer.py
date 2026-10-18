@@ -63,23 +63,36 @@ Identifie les 1 à 3 extraits les plus captivants et viraux respectant les crit�
 
     console.print(f"[cyan]Analyse virale en cours avec Gemini ({model_name})...[/cyan]")
 
-    try:
-        response = client.models.generate_content(
-            model=model_name,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                system_instruction=ANALYSIS_SYSTEM_INSTRUCTION,
-                response_mime_type="application/json",
-                response_schema=ViralAnalysisResult,
-                temperature=0.3, # Déterministe et précis sur les timestamps
-            ),
-        )
-    except Exception as e:
-        # Fallback sur gemini-2.0-flash si gemini-3.8-flash n'est pas dispo
-        if "not found" in str(e).lower() and model_name != "gemini-2.0-flash":
-            console.print(f"[yellow]Modèle {model_name} indisponible, bascule sur gemini-2.0-flash...[/yellow]")
-            return analyze_video_for_viral_clips(metadata, segments, model_name="gemini-2.0-flash")
-        raise e
+    import time
+    last_err = None
+    response = None
+    for attempt in range(3):
+        try:
+            response = client.models.generate_content(
+                model=model_name,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=ANALYSIS_SYSTEM_INSTRUCTION,
+                    response_mime_type="application/json",
+                    response_schema=ViralAnalysisResult,
+                    temperature=0.3, # Déterministe et précis sur les timestamps
+                ),
+            )
+            break
+        except Exception as e:
+            last_err = e
+            err_str = str(e).lower()
+            if "503" in err_str or "unavailable" in err_str or "429" in err_str or "resource_exhausted" in err_str:
+                console.print(f"[yellow]Tentative {attempt+1}/3 : Gemini saturé temporairement, nouvelle tentative dans 4s...[/yellow]")
+                time.sleep(4)
+                continue
+            if "not found" in err_str and model_name != "gemini-2.0-flash":
+                console.print(f"[yellow]Modèle {model_name} indisponible, bascule sur gemini-2.0-flash...[/yellow]")
+                return analyze_video_for_viral_clips(metadata, segments, model_name="gemini-2.0-flash")
+            raise e
+    else:
+        if last_err:
+            raise last_err
 
     result_text = response.text
     if not result_text:
