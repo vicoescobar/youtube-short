@@ -12,6 +12,8 @@ from src.extractor import get_video_metadata, extract_transcript, format_timesta
 from src.analyzer import analyze_video_for_viral_clips
 from src.clipper import (
     generate_ass_subtitles,
+    download_source_video,
+    cut_local_video_segment,
     download_video_segment,
     render_vertical_short,
 )
@@ -24,7 +26,8 @@ def render_single_clip(
     selected_clip,
     clip_index: int,
     segments,
-    crop_mode: str
+    crop_mode: str,
+    source_video: Optional[Path] = None
 ) -> Path:
     """Télécharge, sous-titre et encode un Short individuel"""
     clip_dur = selected_clip.end_time - selected_clip.start_time
@@ -47,13 +50,21 @@ def render_single_clip(
     output_meta_path = OUTPUT_DIR / f"{clean_id}_short_{clip_index + 1}.json"
 
     try:
-        # 1. Téléchargement ciblé du segment
-        download_video_segment(
-            url, 
-            selected_clip.start_time, 
-            selected_clip.end_time, 
-            raw_video_path
-        )
+        # 1. Découpage local FFmpeg (ou téléchargement ciblé yt-dlp en fallback)
+        if source_video and source_video.exists():
+            cut_local_video_segment(
+                source_video,
+                selected_clip.start_time,
+                selected_clip.end_time,
+                raw_video_path
+            )
+        else:
+            download_video_segment(
+                url, 
+                selected_clip.start_time, 
+                selected_clip.end_time, 
+                raw_video_path
+            )
 
         # 2. Génération sous-titres stylisés ASS
         generate_ass_subtitles(
@@ -231,17 +242,35 @@ def main():
         # 8. Génération séquentielle des clips
         console.print(f"\n[bold cyan]Lancement de la génération de {len(clips_to_generate)} Short(s)...[/bold cyan]\n")
 
+        source_video = None
+        if len(clips_to_generate) > 1:
+            try:
+                source_video_path = TEMP_DIR / f"{metadata.video_id}_source.mp4"
+                download_source_video(url, source_video_path)
+                if source_video_path.exists() and source_video_path.stat().st_size > 1000:
+                    source_video = source_video_path
+            except Exception as e:
+                console.print(f"[yellow]Téléchargement source global échoué ({e}), fallback par segment...[/yellow]")
+
         generated_files = []
-        for c_idx in clips_to_generate:
-            output_file = render_single_clip(
-                url=url,
-                metadata=metadata,
-                selected_clip=analysis.clips[c_idx],
-                clip_index=c_idx,
-                segments=segments,
-                crop_mode=crop_mode
-            )
-            generated_files.append(output_file)
+        try:
+            for c_idx in clips_to_generate:
+                try:
+                    output_file = render_single_clip(
+                        url=url,
+                        metadata=metadata,
+                        selected_clip=analysis.clips[c_idx],
+                        clip_index=c_idx,
+                        segments=segments,
+                        crop_mode=crop_mode,
+                        source_video=source_video
+                    )
+                    generated_files.append(output_file)
+                except Exception as clip_err:
+                    console.print(f"[bold red]❌ Erreur lors du rendu du Short #{c_idx + 1} :[/bold red] {clip_err}")
+        finally:
+            if source_video and source_video.exists():
+                source_video.unlink()
 
         console.print(Panel.fit(
             f"[bold green]🎉 Félicitations ! {len(generated_files)} Short(s) généré(s) avec succès :[/bold green]\n" +

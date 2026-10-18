@@ -139,6 +139,58 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         f.write("\n".join(dialogues))
         f.write("\n")
 
+def download_source_video(url: str, output_path: Path) -> Path:
+    """
+    Télécharge la vidéo source complète en 1 seule requête (max 1080p).
+    Permet ensuite d'extraire tous les extraits localement avec FFmpeg sans jamais
+    recontacter YouTube ni risquer de blocages anti-bot ou d'expiration de session.
+    """
+    console.print(f"[cyan]Téléchargement unique de la vidéo source via yt-dlp...[/cyan]")
+    ydl_opts = {
+        **get_base_ydl_opts(),
+        'format': 'bestvideo[vcodec^=avc1][height<=1080]+bestaudio[ext=m4a]/bestvideo[height<=1080]+bestaudio/bestvideo+bestaudio/best',
+        'outtmpl': str(output_path),
+    }
+
+    if output_path.exists():
+        output_path.unlink()
+
+    clean_url = sanitize_youtube_url(url)
+    run_ydl_with_fallback(ydl_opts, lambda ydl: ydl.download([clean_url]))
+    return output_path
+
+def cut_local_video_segment(
+    source_video_path: Path,
+    start_time: float,
+    end_time: float,
+    output_raw_video: Path
+) -> Path:
+    """
+    Extrait un segment précis (ex: 30-60s) depuis une vidéo locale avec FFmpeg.
+    Accurate seek pour une synchronisation image/son parfaite à la milliseconde sans solliciter YouTube.
+    """
+    console.print(f"[cyan]Découpage local FFmpeg [{start_time:.2f}s -> {end_time:.2f}s]...[/cyan]")
+    if output_raw_video.exists():
+        output_raw_video.unlink()
+
+    duration = max(0.5, end_time - start_time)
+    cmd = [
+        "ffmpeg", "-y",
+        "-ss", str(start_time),
+        "-t", str(duration),
+        "-i", str(source_video_path),
+        "-c:v", "libx264",
+        "-preset", "veryfast",
+        "-crf", "18",
+        "-c:a", "aac",
+        "-b:a", "192k",
+        str(output_raw_video)
+    ]
+    res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if res.returncode != 0:
+        raise RuntimeError(f"Erreur découpage FFmpeg local : {res.stderr[-400:]}")
+    return output_raw_video
+
 def download_video_segment(
     url: str,
     start_time: float,
@@ -146,7 +198,7 @@ def download_video_segment(
     output_raw_video: Path
 ) -> None:
     """
-    Télécharge UNIQUEMENT l'extrait vidéo ciblé (30-60s) via yt-dlp.
+    Télécharge UNIQUEMENT l'extrait vidéo ciblé (30-60s) via yt-dlp (fallback).
     Utilise le cut exact sans forcer sur les keyframes pour éviter tout décalage audio/vidéo.
     """
     console.print(f"[cyan]Téléchargement ciblé du segment [{start_time:.2f}s -> {end_time:.2f}s]...[/cyan]")

@@ -18,6 +18,8 @@ from src.extractor import get_video_metadata, extract_transcript, format_timesta
 from src.analyzer import analyze_video_for_viral_clips
 from src.clipper import (
     generate_ass_subtitles,
+    download_source_video,
+    cut_local_video_segment,
     download_video_segment,
     render_vertical_short,
 )
@@ -88,52 +90,80 @@ def run_pipeline_task(job_id: str, url: str, crop_mode: str, auto_render: bool, 
 
         # Rendu séquentiel automatique des clips
         job["rendered_clips"] = []
-        for idx, clip in enumerate(analysis.clips):
-            job["step"] = f"Rendu du Short #{idx + 1}/{len(analysis.clips)} ({crop_mode})..."
+        source_video = None
+        clean_id = metadata.video_id
+
+        # 1. Téléchargement unique de la vidéo source pour éviter les requêtes répétées vers YouTube
+        try:
+            source_video_path = TEMP_DIR / f"{clean_id}_full_{job_id[:6]}.mp4"
+            job["step"] = f"Téléchargement unique de la vidéo source ({round(metadata.duration / 60)} min)..."
             job["updated_at"] = datetime.now().isoformat()
+            download_source_video(clean_url, source_video_path)
+            if source_video_path.exists() and source_video_path.stat().st_size > 1000:
+                source_video = source_video_path
+        except Exception as dl_err:
+            console.print(f"[yellow]Téléchargement global source impossible ({dl_err}), fallback sur découpe individuelle...[/yellow]")
+            source_video = None
 
-            clean_id = metadata.video_id
-            raw_video = TEMP_DIR / f"{clean_id}_clip_{idx}_{job_id[:6]}.mp4"
-            ass_sub = TEMP_DIR / f"{clean_id}_sub_{idx}_{job_id[:6]}.ass"
-            
-            timestamp_id = datetime.now().strftime("%Y%m%d_%H%M%S")
-            short_filename = f"{clean_id}_short_{idx + 1}_{timestamp_id}"
-            out_mp4 = OUTPUT_DIR / f"{short_filename}.mp4"
-            out_meta = OUTPUT_DIR / f"{short_filename}.json"
+        try:
+            for idx, clip in enumerate(analysis.clips):
+                job["step"] = f"Génération du Short #{idx + 1}/{len(analysis.clips)} ({crop_mode})..."
+                job["updated_at"] = datetime.now().isoformat()
 
-            try:
-                # 1. Téléchargement ciblé
-                download_video_segment(url, clip.start_time, clip.end_time, raw_video)
-                # 2. Sous-titres ASS
-                generate_ass_subtitles(segments, clip.start_time, clip.end_time, ass_sub)
-                # 3. Rendu 9:16 FFmpeg avec face-tracking
-                render_vertical_short(raw_video, ass_sub, out_mp4, crop_mode=crop_mode)
+                raw_video = TEMP_DIR / f"{clean_id}_clip_{idx}_{job_id[:6]}.mp4"
+                ass_sub = TEMP_DIR / f"{clean_id}_sub_{idx}_{job_id[:6]}.ass"
+                
+                timestamp_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+                short_filename = f"{clean_id}_short_{idx + 1}_{timestamp_id}"
+                out_mp4 = OUTPUT_DIR / f"{short_filename}.mp4"
+                out_meta = OUTPUT_DIR / f"{short_filename}.json"
 
-                # 4. Métadonnées du Short
-                meta_payload = {
-                    "id": short_filename,
-                    "source_url": url,
-                    "source_title": metadata.title,
-                    "source_channel": metadata.channel,
-                    "clip_index": idx + 1,
-                    "crop_mode": crop_mode,
-                    "clip": clip.model_dump(),
-                    "created_at": datetime.now().isoformat(),
-                    "output_file": str(out_mp4)
-                }
-                with open(out_meta, "w", encoding="utf-8") as f:
-                    json.dump(meta_payload, f, ensure_ascii=False, indent=2)
+                try:
+                    # 1. Découpage local sans solliciter YouTube (ou fallback téléchargement ciblé)
+                    if source_video and source_video.exists():
+                        cut_local_video_segment(source_video, clip.start_time, clip.end_time, raw_video)
+                    else:
+                        download_video_segment(clean_url, clip.start_time, clip.end_time, raw_video)
 
-                job["rendered_clips"].append(short_filename)
-            finally:
-                if raw_video.exists():
-                    raw_video.unlink()
-                if ass_sub.exists():
-                    ass_sub.unlink()
+                    # 2. Sous-titres ASS
+                    generate_ass_subtitles(segments, clip.start_time, clip.end_time, ass_sub)
 
-        job["status"] = "completed"
-        job["step"] = f"Tous les Shorts ont été générés avec succès ({len(job['rendered_clips'])} vidéos)."
-        job["updated_at"] = datetime.now().isoformat()
+                    # 3. Rendu 9:16 FFmpeg avec face-tracking
+                    render_vertical_short(raw_video, ass_sub, out_mp4, crop_mode=crop_mode)
+
+                    # 4. Métadonnées du Short
+                    meta_payload = {
+                        "id": short_filename,
+                        "source_url": url,
+                        "source_title": metadata.title,
+                        "source_channel": metadata.channel,
+                        "clip_index": idx + 1,
+                        "crop_mode": crop_mode,
+                        "clip": clip.model_dump(),
+                        "created_at": datetime.now().isoformat(),
+                        "output_file": str(out_mp4)
+                    }
+                    with open(out_meta, "w", encoding="utf-8") as f:
+                        json.dump(meta_payload, f, ensure_ascii=False, indent=2)
+
+                    job["rendered_clips"].append(short_filename)
+                except Exception as clip_err:
+                    console.print(f"[red]Erreur lors de la génération du clip #{idx+1} : {clip_err}[/red]")
+                finally:
+                    if raw_video.exists():
+                        raw_video.unlink()
+                    if ass_sub.exists():
+                        ass_sub.unlink()
+        finally:
+            if source_video and source_video.exists():
+                source_video.unlink()
+
+        if job["rendered_clips"]:
+            job["status"] = "completed"
+            job["step"] = f"Tous les Shorts ont été générés avec succès ({len(job['rendered_clips'])}/{len(analysis.clips)} vidéos)."
+            job["updated_at"] = datetime.now().isoformat()
+        else:
+            raise RuntimeError("Aucun Short n'a pu être généré. Vérifiez les cookies YouTube ou réessayez.")
 
     except Exception as e:
         err_msg = str(e)
